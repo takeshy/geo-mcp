@@ -1,0 +1,34 @@
+output "project_id" {
+  description = "Dedicated Geo Home GCP project ID."
+  value       = var.project_id
+}
+
+output "region" {
+  description = "Deployment region."
+  value       = var.region
+}
+
+output "cloud_run_url" {
+  description = "Geo Home Cloud Run URL."
+  value       = google_cloud_run_v2_service.app.uri
+}
+
+output "mcp_url" {
+  description = "Streamable HTTP MCP endpoint."
+  value       = "${google_cloud_run_v2_service.app.uri}/mcp"
+}
+
+output "bucket_name" {
+  description = "GCS bucket for land-price JSON and PMTiles."
+  value       = google_storage_bucket.data.name
+}
+
+output "artifact_repository_id" {
+  description = "Artifact Registry repository ID."
+  value       = google_artifact_registry_repository.app.repository_id
+}
+
+output "cloud_build_service_account_email" {
+  description = "Dedicated service account used by gcloud builds submit."
+  value       = google_service_account.cloud_build.email
+}

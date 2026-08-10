@@ -1,0 +1,14 @@
+project_id = "your-geo-home-project-id"
+region     = "asia-northeast1"
+
+# Replace * with the GemiHub Business and Codex web origins in production.
+cors_origins = ["*"]
+public_tiles = true
+
+# Leave empty for the built-in demo, then set these after uploading data.
+land_price_object    = ""
+pmtiles_object       = ""
+pmtiles_source_layer = "land-price"
+
+# Create the secret separately, or leave empty for estimated commute times.
+google_maps_secret_id = ""

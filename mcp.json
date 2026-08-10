@@ -1,0 +1,9 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "geo-home": {
+      "type": "streamable-http",
+      "url": "https://geo-home-mcp-ycqo5pm7gq-an.a.run.app/mcp"
+    }
+  }
+}

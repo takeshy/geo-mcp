@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Geo Home Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
+  <style>
+    *{box-sizing:border-box}html,body{height:100%;margin:0;font:14px system-ui,sans-serif;color:#17202a;background:#f7f8fa}
+    #app{height:100%;display:grid;grid-template-columns:minmax(240px,330px) 1fr}.panel{padding:18px;overflow:auto;background:#fff;border-right:1px solid #dde2e8;z-index:2}
+    h1{font-size:18px;margin:0 0 5px}.sub{color:#65717e;font-size:12px;margin-bottom:14px}.candidate{border:1px solid #e2e7ec;border-radius:12px;padding:11px;margin:8px 0;cursor:pointer;background:#fff}.candidate:hover{border-color:#1d8a63}.candidate b{display:block}.metric{display:flex;gap:8px;margin-top:6px;color:#45515e;font-size:12px}.rank{color:#13845d}.warnings{font-size:11px;color:#7d5c13;background:#fff8dd;border-radius:8px;padding:9px;margin-top:12px}.empty{padding:20px;color:#65717e}
+    #map{height:100%;min-height:400px}.badge{display:inline-block;border-radius:20px;padding:2px 7px;background:#e7f8f0;color:#176c50;font-weight:650;font-size:11px}
+    @media(max-width:700px){#app{grid-template-columns:1fr;grid-template-rows:220px 1fr}.panel{border-right:0;border-bottom:1px solid #dde2e8;padding:12px}.candidate{display:inline-block;width:210px;margin-right:7px;vertical-align:top}.list{white-space:nowrap;overflow-x:auto}h1{font-size:16px}}
+  </style>
+</head>
+<body>
+<div id="app"><aside class="panel"><h1 id="title">地価・移動時間マップ</h1><div class="sub">候補地点を選ぶと詳細を表示します</div><div id="list" class="list"><div class="empty">データを読み込み中…</div></div><div id="warnings"></div></aside><main id="map"></main></div>
+<script>
+  let map;
+  let latest;
+  window.addEventListener("message", event => {
+    if (event.data?.method === "toolResult") render(event.data.params?.structuredContent);
+  });
+  if (window.parent === window) fetch("/api/demo").then(r => r.json()).then(render).catch(showError);
+
+  function render(data){
+    if (!data?.candidates) return;
+    latest=data; document.getElementById("title").textContent=data.title||"地価・移動時間マップ";
+    document.getElementById("list").innerHTML=data.candidates.map((c,i)=>`<article class="candidate" data-id="${escapeHtml(c.id)}"><b><span class="rank">${i+1}.</span> ${escapeHtml(c.area)}</b><div>${escapeHtml(c.municipality)} · ${escapeHtml(c.station)}駅 ${c.stationWalkMinutes}分</div><div class="metric"><span class="badge">${formatYen(c.pricePerSqm)}/㎡</span><span>${c.commute.durationMinutes}分</span><span>前年比 ${signed(c.trendPercent)}%</span></div></article>`).join("")||'<div class="empty">条件に合う候補がありません</div>';
+    document.getElementById("warnings").innerHTML=(data.disclaimer||[]).length?`<div class="warnings">${data.disclaimer.map(escapeHtml).join("<br>")}</div>`:"";
+    drawMap(data);
+    document.querySelectorAll(".candidate").forEach(el=>el.onclick=()=>focus(el.dataset.id));
+  }
+  function drawMap(data){
+    if (!window.maplibregl){showError(new Error("MapLibreを読み込めませんでした"));return}
+    if (data.pmtilesUrl && window.pmtiles){const protocol=new pmtiles.Protocol();maplibregl.addProtocol("pmtiles",protocol.tile)}
+    map?.remove();
+    map=new maplibregl.Map({container:"map",style:data.basemapStyleUrl||{version:8,sources:{},layers:[{id:"bg",type:"background",paint:{"background-color":"#eef1f4"}}]},center:[data.destination.lng,data.destination.lat],zoom:8});
+    map.addControl(new maplibregl.NavigationControl(),"top-right");
+    map.on("load",()=>{
+      if(data.pmtilesUrl){map.addSource("land-price-pmtiles",{type:"vector",url:`pmtiles://${data.pmtilesUrl}`});map.addLayer({id:"land-price-pmtiles",type:"circle",source:"land-price-pmtiles","source-layer":data.pmtilesSourceLayer||"land-price",paint:{"circle-radius":4,"circle-color":"#7057d9","circle-opacity":.55}})}
+      map.addSource("candidates",{type:"geojson",data:featureCollection(data.candidates)});
+      map.addLayer({id:"candidates",type:"circle",source:"candidates",paint:{"circle-radius":["interpolate",["linear"],["get","score"],0,7,100,16],"circle-color":["interpolate",["linear"],["get","pricePerSqm"],150000,"#16a36d",300000,"#efb331",500000,"#df5a54"],"circle-stroke-color":"#fff","circle-stroke-width":2}});
+      new maplibregl.Marker({color:"#252b33"}).setLngLat([data.destination.lng,data.destination.lat]).setPopup(new maplibregl.Popup().setText(data.destination.name||"目的地")).addTo(map);
+      map.on("click","candidates",e=>{const p=e.features?.[0]?.properties;if(p)new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${escapeHtml(p.area)}</b><br>${formatYen(Number(p.pricePerSqm))}/㎡<br>通勤 ${p.commuteMinutes}分`).addTo(map)});
+      map.on("mouseenter","candidates",()=>map.getCanvas().style.cursor="pointer");map.on("mouseleave","candidates",()=>map.getCanvas().style.cursor="");
+      fit(data);
+    });
+  }
+  function featureCollection(rows){return{type:"FeatureCollection",features:rows.map(c=>({type:"Feature",geometry:{type:"Point",coordinates:[c.lng,c.lat]},properties:{id:c.id,area:c.area,pricePerSqm:c.pricePerSqm,commuteMinutes:c.commute.durationMinutes,score:c.score}}))}}
+  function fit(data){const coords=data.candidates.map(c=>[c.lng,c.lat]);coords.push([data.destination.lng,data.destination.lat]);if(coords.length>1){const b=coords.reduce((b,c)=>b.extend(c),new maplibregl.LngLatBounds(coords[0],coords[0]));map.fitBounds(b,{padding:55,maxZoom:11})}}
+  function focus(id){const c=latest?.candidates.find(x=>x.id===id);if(c)map.flyTo({center:[c.lng,c.lat],zoom:12})}
+  function formatYen(n){return new Intl.NumberFormat("ja-JP",{style:"currency",currency:"JPY",maximumFractionDigits:0}).format(n)}
+  function signed(n){return`${n>=0?"+":""}${Number(n).toFixed(1)}`}
+  function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+  function showError(e){document.getElementById("list").innerHTML=`<div class="empty">${escapeHtml(e.message||e)}</div>`}
+</script>
+</body>
+</html>
