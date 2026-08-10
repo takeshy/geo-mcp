@@ -63,12 +63,6 @@ variable "basemap_style_url" {
   default     = "https://tiles.openfreemap.org/styles/bright"
 }
 
-variable "google_maps_secret_id" {
-  description = "Existing Secret Manager secret ID containing the Google Routes API key. Empty uses demo estimates."
-  type        = string
-  default     = ""
-}
-
 variable "bootstrap_image" {
   description = "Safe image used only until the first Cloud Build deployment."
   type        = string

@@ -11,7 +11,7 @@ export async function findCandidates(
     (input.maxPricePerSqm === undefined || point.pricePerSqm <= input.maxPricePerSqm),
   );
   const candidates = await Promise.all(eligible.map(async (point): Promise<Candidate> => {
-    const commute = await computeCommute(point, input.destination, input.arrivalTime);
+    const commute = await computeCommute(point, input.destination, input.arrivalTime, point.commuteProfiles);
     const trendPercent = ((point.pricePerSqm - point.previousPricePerSqm) / point.previousPricePerSqm) * 100;
     const priceScore = input.maxPricePerSqm
       ? Math.max(0, 1 - point.pricePerSqm / input.maxPricePerSqm)

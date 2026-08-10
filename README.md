@@ -8,7 +8,7 @@
 - `list_layers`, `get_land_price`, `compute_commute`, `find_candidate_areas`, `compare_areas`, `build_area_map`
 - MCP Appとして表示できるMapLibre地図
 - GCS上のPMTilesと地価JSONの読み込み
-- Google Routes APIによる公共交通時間（未設定時は明示付きデモ推定）
+- オープンデータから事前計算した公共交通時間（未収録の目的地は明示付きデモ推定）
 - GemiHub Business Agent PluginとCodex Pluginのmanifest
 
 ## ローカル起動
@@ -41,15 +41,38 @@ npm run dev
   "stationWalkMinutes": 8,
   "source": "国土交通省 不動産情報ライブラリ",
   "sourceUrl": "https://www.reinfolib.mlit.go.jp/",
-  "observedAt": "2026-01-01"
+  "observedAt": "2026-01-01",
+  "commuteProfiles": [
+    {
+      "destination": "東京駅",
+      "lat": 35.6812,
+      "lng": 139.7671,
+      "durationMinutes": 35,
+      "transfers": 1,
+      "source": "GTFS等からの事前計算",
+      "observedAt": "2026-01-01"
+    }
+  ]
 }
 ```
 
-国土交通省APIの利用申請・利用条件を確認し、ETLでこの正規化形式へ変換してください。公示地価、基準地価、実取引価格は意味が異なるため、同一系列として混ぜないでください。本番では `series` などの列を追加して別レイヤー化することを推奨します。
+国土交通省APIの利用申請・利用条件を確認し、ETLでこの正規化形式へ変換してください。公示地価、基準地価、実取引価格は意味が異なるため、同一系列として混ぜないでください。本番では `series` などの列を追加して別レイヤー化することを推奨します。公共交通時間はGTFSなど再配布条件を確認できるオープンデータから事前計算し、出典と観測日を `commuteProfiles` に保持します。PMTilesは地価・候補地点の地図配信に使い、経路計算結果はこのJSONプロファイルから参照します。
 
 ## PMTiles
 
 `.pmtiles` をCloud Storageへアップロードし、CORSで `Range` リクエストを許可した配信URLを `PMTILES_URL` に設定します。ベクトルタイル内のsource layer名を `PMTILES_SOURCE_LAYER` に指定してください。
+
+同梱デモデータからPMTilesを生成してTerraform管理のGCSバケットへ配置する場合:
+
+```bash
+gcloud builds submit \
+  --region=asia-northeast1 \
+  --config=cloudbuild-data.yaml \
+  --service-account="projects/PROJECT_ID/serviceAccounts/geo-home-build@PROJECT_ID.iam.gserviceaccount.com" \
+  .
+```
+
+このビルドはGeoJSONを生成し、tippecanoe 2.29.0で `land-price` source layerのPMTilesへ変換します。
 
 例となるCORS設定:
 
@@ -83,7 +106,6 @@ Terraformが次を管理します。
 
 - Cloud Runサービス、スケーリング、health check、公開Invoker
 - GCSバケット、PMTiles用CORS、Cloud Run読み取り権限
-- 任意のGoogle Routes APIキーのSecret Manager参照権限
 - 地価JSONとPMTilesのCloud Run環境変数
 
 Cloud RunのコンテナイメージだけはTerraformの `ignore_changes` 対象です。既存メインサービスと同様、Terraformがインフラ、Cloud Buildがアプリケーションイメージを管理します。
@@ -102,7 +124,6 @@ cors_origins        = ["https://YOUR_GEMIBIZ_DOMAIN"]
 land_price_object   = "land-prices.json"
 pmtiles_object      = "land-price.pmtiles"
 pmtiles_source_layer = "land-price"
-google_maps_secret_id = "google-maps-api-key"
 ```
 
 オブジェクト名とSecret IDは、実データをまだ用意しない場合は空のままで構いません。その場合、組み込みデモデータと推定移動時間で起動します。
@@ -128,8 +149,6 @@ Geo Home MCPリポジトリのルートから実行します。
 スクリプトはこのリポジトリのTerraform outputからプロジェクト、リージョン、Artifact Registry、Cloud Build専用SAを取得してCloud Buildを実行します。Cloud Buildは作成済みCloud Runサービスのイメージだけを更新します。デプロイ後にCloud Run URLを取得し、`mcp.json` と `.mcp.json` の接続先も自動更新します。更新された2ファイルはGitへcommitしてからAgent Pluginをインストールしてください。
 
 別環境へ出す場合だけ `GEO_PROJECT_ID`、`GEO_REGION`、`GEO_SERVICE` を上書きできます。ただしCloud Build側の `_PROJECT_ID` なども `--substitutions` で一致させてください。
-
-`GOOGLE_MAPS_API_KEY` はCloud Buildへ渡しません。Terraform変数 `geo_home_google_maps_secret_id` で既存Secret Manager secretを参照します。
 
 ## Plugin接続先の更新
 

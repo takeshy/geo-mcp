@@ -5,8 +5,6 @@ locals {
     "cloudbuild.googleapis.com",
     "iam.googleapis.com",
     "run.googleapis.com",
-    "routes.googleapis.com",
-    "secretmanager.googleapis.com",
     "storage.googleapis.com",
   ])
   cloud_build_roles = toset([
@@ -14,6 +12,7 @@ locals {
     "roles/cloudbuild.builds.builder",
     "roles/logging.logWriter",
     "roles/run.admin",
+    "roles/storage.objectAdmin",
   ])
 }
 
@@ -95,22 +94,6 @@ resource "google_storage_bucket_iam_member" "public_reader" {
   member = "allUsers"
 }
 
-data "google_secret_manager_secret" "google_maps" {
-  count = var.google_maps_secret_id != "" ? 1 : 0
-
-  project   = var.project_id
-  secret_id = var.google_maps_secret_id
-}
-
-resource "google_secret_manager_secret_iam_member" "google_maps" {
-  count = var.google_maps_secret_id != "" ? 1 : 0
-
-  project   = var.project_id
-  secret_id = data.google_secret_manager_secret.google_maps[0].secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.runtime.email}"
-}
-
 resource "google_cloud_run_v2_service" "app" {
   project             = var.project_id
   name                = var.service_name
@@ -174,19 +157,6 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
 
-      dynamic "env" {
-        for_each = var.google_maps_secret_id != "" ? [var.google_maps_secret_id] : []
-        content {
-          name = "GOOGLE_MAPS_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = env.value
-              version = "latest"
-            }
-          }
-        }
-      }
-
       startup_probe {
         http_get {
           path = "/healthz"
@@ -210,7 +180,6 @@ resource "google_cloud_run_v2_service" "app" {
   depends_on = [
     google_artifact_registry_repository.app,
     google_storage_bucket_iam_member.runtime_reader,
-    google_secret_manager_secret_iam_member.google_maps,
   ]
 }
 

@@ -1,0 +1,39 @@
+steps:
+  - name: node:24-slim
+    entrypoint: node
+    args:
+      - scripts/land-prices-to-geojson.mjs
+      - data/land-prices.demo.json
+      - generated/land-price.geojson
+
+  - name: ubuntu:24.04
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates git libsqlite3-dev zlib1g-dev
+        git clone --branch 2.29.0 --depth 1 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+        make -C /tmp/tippecanoe -j2 tippecanoe
+        /tmp/tippecanoe/tippecanoe \
+          --output=/workspace/generated/land-price.pmtiles \
+          --force \
+          --layer=land-price \
+          --minimum-zoom=0 \
+          --maximum-zoom=14 \
+          /workspace/generated/land-price.geojson
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - storage
+      - cp
+      - generated/land-price.pmtiles
+      - gs://${_BUCKET}/${_OBJECT}
+
+substitutions:
+  _BUCKET: geo-home-mcp-505104-data
+  _OBJECT: land-price.pmtiles
+
+options:
+  logging: CLOUD_LOGGING_ONLY

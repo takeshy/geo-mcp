@@ -49,5 +49,15 @@ function validatePoint(raw: unknown): LandPricePoint {
   for (const key of requiredNumbers) {
     if (typeof row[key] !== "number" || !Number.isFinite(row[key])) throw new Error(`Invalid land price field: ${key}`);
   }
+  if (row.commuteProfiles !== undefined) {
+    if (!Array.isArray(row.commuteProfiles)) throw new Error("Invalid commuteProfiles");
+    for (const profile of row.commuteProfiles) {
+      if (!profile || typeof profile !== "object") throw new Error("Invalid commute profile");
+      const value = profile as Record<string, unknown>;
+      if (typeof value.destination !== "string" || typeof value.source !== "string" || typeof value.observedAt !== "string") throw new Error("Invalid commute profile metadata");
+      if (typeof value.lat !== "number" || typeof value.lng !== "number" || typeof value.durationMinutes !== "number") throw new Error("Invalid commute profile values");
+      if (value.transfers !== null && typeof value.transfers !== "number") throw new Error("Invalid commute profile transfers");
+    }
+  }
   return row as unknown as LandPricePoint;
 }

@@ -52,7 +52,7 @@ export function createGeoMcpServer(repository = new LandPriceRepository()): McpS
         {
           id: "commute-time",
           title: "公共交通所要時間",
-          source: process.env.GOOGLE_MAPS_API_KEY ? "Google Routes API" : "straight-line demonstration estimate",
+          source: "precomputed open transit profiles with straight-line fallback",
         },
         ...(process.env.PMTILES_URL ? [{ id: "pmtiles", title: "Configured PMTiles layer", source: process.env.PMTILES_URL }] : []),
       ],
@@ -71,7 +71,7 @@ export function createGeoMcpServer(repository = new LandPriceRepository()): McpS
   server.registerTool(
     "compute_commute",
     {
-      description: "Compute public-transit travel time between two coordinates. Uses Google Routes when configured.",
+      description: "Compute travel time from bundled precomputed transit profiles, with a clearly marked estimate fallback.",
       inputSchema: {
         origin: coordinateSchema,
         destination: coordinateSchema,
@@ -111,7 +111,7 @@ export function createGeoMcpServer(repository = new LandPriceRepository()): McpS
       const rows = await Promise.all(areas.map(async (area) => {
         const observations = await repository.byArea(area);
         const point = observations[0];
-        return point ? { ...point, commute: await computeCommute(point, destination, arrivalTime) } : { area, error: "No observation found" };
+        return point ? { ...point, commute: await computeCommute(point, destination, arrivalTime, point.commuteProfiles) } : { area, error: "No observation found" };
       }));
       return jsonResult({ destination, comparisons: rows });
     },
@@ -120,7 +120,7 @@ export function createGeoMcpServer(repository = new LandPriceRepository()): McpS
   server.registerTool(
     "build_area_map",
     {
-      description: "Build an interactive map of land-price and commute candidates. Use this when the user asks to see results on a map.",
+      description: "Build an interactive PMTiles/MapLibre map of land-price and commute candidates. Call this after candidate searches so users can inspect locations visually.",
       inputSchema: searchSchema,
       _meta: { ui: { resourceUri: UI_URI } },
     },
@@ -157,7 +157,7 @@ function jsonResult(value: unknown) {
 function disclaimer(candidates: Array<{ commute: { mode: string } }>): string[] {
   const messages = ["地価は土地・建物の購入総額ではありません。接道、形状、建築条件などは個別確認が必要です。"];
   if (candidates.some((candidate) => candidate.commute.mode === "estimate")) {
-    messages.push("移動時間はデモ推定です。Google Routes APIを設定して公共交通時間に切り替えてください。");
+    messages.push("一致する事前計算済み公共交通プロファイルがない地点は、直線距離によるデモ推定です。");
   }
   if (!process.env.LAND_PRICE_DATA_PATH) messages.push("表示中の地価はデモ値であり、実際の購入判断には使用できません。");
   return messages;

@@ -14,13 +14,22 @@ export interface LandPricePoint extends Coordinate {
   source: string;
   sourceUrl: string;
   observedAt: string;
+  commuteProfiles?: CommuteProfile[];
+}
+
+export interface CommuteProfile extends Coordinate {
+  destination: string;
+  durationMinutes: number;
+  transfers: number | null;
+  source: string;
+  observedAt: string;
 }
 
 export interface CommuteResult {
   durationMinutes: number;
   transfers: number | null;
   fareYen: number | null;
-  mode: "google-transit" | "estimate";
+  mode: "precomputed-transit" | "estimate";
   warning?: string;
 }
 

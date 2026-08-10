@@ -7,8 +7,5 @@ public_tiles = true
 
 # Leave empty for the built-in demo, then set these after uploading data.
 land_price_object    = ""
-pmtiles_object       = ""
+pmtiles_object       = "land-price.pmtiles"
 pmtiles_source_layer = "land-price"
-
-# Create the secret separately, or leave empty for estimated commute times.
-google_maps_secret_id = ""
