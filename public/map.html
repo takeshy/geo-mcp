@@ -21,8 +21,12 @@
   let map;
   let latest;
   window.addEventListener("message", event => {
-    if (event.data?.method === "toolResult") render(event.data.params?.structuredContent);
+    if (event.data?.jsonrpc === "2.0" && event.data?.id === "geo-home-init" && event.data?.result) {
+      window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"},"*");
+    }
+    if (event.data?.method === "ui/notifications/tool-result") render(event.data.params?.structuredContent);
   });
+  if (window.parent !== window) window.parent.postMessage({jsonrpc:"2.0",id:"geo-home-init",method:"ui/initialize",params:{protocolVersion:"2026-01-26",appInfo:{name:"geo-home-map",version:"0.1.0"},appCapabilities:{}}},"*");
   if (window.parent === window) fetch("/api/demo").then(r => r.json()).then(render).catch(showError);
 
   function render(data){

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
 import { computeCommute } from "./commute.js";
 import { LandPriceRepository } from "./data.js";
@@ -28,12 +29,13 @@ const searchSchema = {
 export function createGeoMcpServer(repository = new LandPriceRepository()): McpServer {
   const server = new McpServer({ name: "geo-home-mcp", version: "0.1.0" });
 
-  server.registerResource(
+  registerAppResource(
+    server,
     "land-price-map",
-    new ResourceTemplate(UI_URI, { list: undefined }),
-    { title: "地価・移動時間マップ", description: "Interactive candidate-area map", mimeType: "text/html" },
+    UI_URI,
+    { title: "地価・移動時間マップ", description: "Interactive candidate-area map", mimeType: RESOURCE_MIME_TYPE },
     async (uri) => ({
-      contents: [{ uri: uri.href, mimeType: "text/html", text: await readFile(fileURLToPath(mapHtmlUrl), "utf8") }],
+      contents: [{ uri: uri.href, mimeType: RESOURCE_MIME_TYPE, text: await readFile(fileURLToPath(mapHtmlUrl), "utf8"), _meta: { ui: { csp: appCsp() } } }],
     }),
   );
 
@@ -117,7 +119,8 @@ export function createGeoMcpServer(repository = new LandPriceRepository()): McpS
     },
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "build_area_map",
     {
       description: "Build an interactive PMTiles/MapLibre map of land-price and commute candidates. Call this after candidate searches so users can inspect locations visually.",
@@ -145,6 +148,15 @@ export function createGeoMcpServer(repository = new LandPriceRepository()): McpS
   );
 
   return server;
+}
+
+function appCsp() {
+  const connectDomains = new Set<string>(["https://tiles.openfreemap.org"]);
+  for (const value of [process.env.PMTILES_URL, process.env.BASEMAP_STYLE_URL]) {
+    if (!value) continue;
+    try { connectDomains.add(new URL(value).origin); } catch { /* invalid runtime URL is ignored */ }
+  }
+  return { resourceDomains: ["https://unpkg.com"], connectDomains: [...connectDomains] };
 }
 
 function jsonResult(value: unknown) {
