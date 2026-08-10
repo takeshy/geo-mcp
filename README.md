@@ -157,7 +157,9 @@ Geo Home MCPリポジトリのルートから実行します。
 - `mcp.json`: GemiHub Business Agent Plugin用（`streamable-http`）
 - `.mcp.json`: Codex Plugin用（`http`）
 
-現在の `geo-home-mcp.example.com` は安全なplaceholderです。`scripts/deploy.sh` がデプロイ後に実URLへ更新します。GemiHub Businessでは、更新をGitHubへpushした後にrepositoryをAgent Plugin設定画面からpreview・installし、MCP接続テスト後に利用します。
+現在の `geo-home-mcp.example.com` は安全なplaceholderです。`scripts/deploy.sh` がデプロイ後に実URLへ更新します。GemiHub Businessでは、更新をGitHubへpushした後にrepositoryをAgent Plugin設定画面からpreview・installします。インストール時に `tools/list` が自動実行されるため、通常はそのままチャットで利用できます。警告が表示された場合だけ、**Settings > MCP Servers** の接続テストで再試行してください。
+
+チャット内で地図カードを表示するには、`find_candidate_areas` の後に `build_area_map` を呼び出します。`build_area_map` は `_meta.ui.resourceUri` と候補を含む `structuredContent` を返し、GemiHub BusinessがPMTiles/MapLibre製のインタラクティブなMCP Appとして新しいアシスタントメッセージに表示します。修正前に保存済みの回答へカードを後付けすることはできないため、その場合は検索を再実行してください。
 
 手動でURLだけ設定する場合:
 
