@@ -167,6 +167,22 @@ Geo Home MCPリポジトリのルートから実行します。
 node scripts/configure-plugin-url.mjs https://YOUR_SERVICE_URL/mcp
 ```
 
-## セキュリティ
+## セキュリティ（APIキー認証）
 
-MCPクライアントから到達できるよう、TerraformはCloud Run Invokerを `allUsers` に付与します。本番で認証を必須にする場合は `google_cloud_run_v2_service_iam_member.geo_home_public` をOAuth/API Gateway構成へ置き換え、Agent Plugin側にも認証設定を追加してください。
+MCPクライアントから到達できるよう、TerraformはCloud Run Invokerを `allUsers` に付与し、認証はアプリ側で行います。
+`MCP_API_KEY` を設定すると、`/mcp` は `Authorization: Bearer <MCP_API_KEY>` を持つリクエストだけを受け付け、
+それ以外は 401 を返します。`/health`、`/map`、`/api/demo` は引き続き公開です。未設定なら `/mcp` は開いたままで、起動ログに警告が出ます。
+
+```bash
+openssl rand -hex 32          # 生成した値を terraform/terraform.tfvars の mcp_api_key に書く
+terraform -chdir=terraform apply
+terraform -chdir=terraform output -raw mcp_api_key   # クライアントへ配る
+```
+
+クライアント側の設定例です。
+
+- kakeratta: `infra/link-geo-home.sh` がこのリポジトリのTerraform outputからURLとキーを読み、`KAKERATTA_MCP_SERVERS` の `headers.Authorization` に入れます。
+- `.mcp.json`（Codex Plugin）: サーバー定義に `"headers": { "Authorization": "Bearer <MCP_API_KEY>" }` を追加します。
+- `mcp.json`（GemiHub Business）: Agent Plugin設定画面のMCPサーバー認証ヘッダーに同じ値を設定します。
+
+キーはGitへcommitしないでください。`mcp.json` と `.mcp.json` にはURLだけを置きます。

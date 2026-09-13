@@ -142,6 +142,14 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       dynamic "env" {
+        for_each = var.mcp_api_key != "" ? [1] : []
+        content {
+          name  = "MCP_API_KEY"
+          value = var.mcp_api_key
+        }
+      }
+
+      dynamic "env" {
         for_each = var.land_price_object != "" ? [var.land_price_object] : []
         content {
           name  = "LAND_PRICE_DATA_PATH"

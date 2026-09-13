@@ -2,11 +2,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { authorize } from "./auth.js";
 import { LandPriceRepository } from "./data.js";
 import { createGeoMcpServer, defaultDestination } from "./mcp.js";
 import { findCandidates } from "./search.js";
 
 const port = Number(process.env.PORT || 8080);
+const apiKey = process.env.MCP_API_KEY;
 const repository = new LandPriceRepository();
 const mapPath = fileURLToPath(new URL("../public/map.html", import.meta.url));
 
@@ -50,6 +52,10 @@ const httpServer = createServer(async (request, response) => {
 
 async function handleMcp(request: IncomingMessage, response: ServerResponse) {
   if (!["GET", "POST", "DELETE"].includes(request.method || "")) return json(response, 405, { error: "Method not allowed" });
+  if (!authorize(request.headers.authorization, apiKey)) {
+    response.setHeader("WWW-Authenticate", 'Bearer realm="geo-home-mcp"');
+    return json(response, 401, { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Unauthorized: send Authorization: Bearer <MCP_API_KEY>" } });
+  }
   const mcp = createGeoMcpServer(repository);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   response.on("close", () => {
@@ -73,4 +79,5 @@ function json(response: ServerResponse, status: number, value: unknown) {
 
 httpServer.listen(port, "0.0.0.0", () => {
   console.log(`Geo Home MCP listening on http://0.0.0.0:${port}`);
+  if (!(apiKey ?? "").trim()) console.warn("MCP_API_KEY is not set: /mcp accepts unauthenticated requests.");
 });

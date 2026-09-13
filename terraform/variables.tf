@@ -68,3 +68,15 @@ variable "bootstrap_image" {
   type        = string
   default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
+
+variable "mcp_api_key" {
+  description = "Shared bearer token every MCP client must send as Authorization: Bearer <key>. Empty leaves /mcp open."
+  type        = string
+  default     = ""
+  sensitive   = true
+
+  validation {
+    condition     = var.mcp_api_key == "" || length(var.mcp_api_key) >= 32
+    error_message = "mcp_api_key must be empty or at least 32 characters (for example: openssl rand -hex 32)."
+  }
+}

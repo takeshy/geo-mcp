@@ -32,3 +32,9 @@ output "cloud_build_service_account_email" {
   description = "Dedicated service account used by gcloud builds submit."
   value       = google_service_account.cloud_build.email
 }
+
+output "mcp_api_key" {
+  description = "Bearer token MCP clients must send. Read with: terraform output -raw mcp_api_key"
+  value       = var.mcp_api_key
+  sensitive   = true
+}

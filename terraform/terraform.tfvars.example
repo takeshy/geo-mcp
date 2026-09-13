@@ -9,3 +9,7 @@ public_tiles = true
 land_price_object    = ""
 pmtiles_object       = "land-price.pmtiles"
 pmtiles_source_layer = "land-price"
+
+# Shared secret for /mcp. Generate with: openssl rand -hex 32
+# Every client (kakeratta, Agent Plugins) sends it as Authorization: Bearer <key>.
+mcp_api_key = ""
