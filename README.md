@@ -6,6 +6,7 @@
 
 - Cloud Run向けMCPサーバー (`/mcp`)
 - `list_layers`, `get_land_price`, `compute_commute`, `find_candidate_areas`, `compare_areas`, `build_area_map`
+- `place_search`（周辺の店と営業時間）, `route`（車・徒歩・自転車の所要時間）
 - MCP Appとして表示できるMapLibre地図
 - GCS上のPMTilesと地価JSONの読み込み
 - オープンデータから事前計算した公共交通時間（未収録の目的地は明示付きデモ推定）
@@ -23,6 +24,21 @@ npm run dev
 - Health check: http://localhost:8080/health
 
 初期状態は `data/land-prices.demo.json` を使用します。この値はUI・ツール動作確認専用です。
+
+## 周辺検索と経路
+
+`place_search` と `route` はOpenStreetMapのサービスを呼びます。位置は呼び出し側が `lat` / `lng` で渡します（サーバーは利用者の現在地を知りません）。`place_search` は位置がなければ名前検索になり、`route` は位置が必須です。
+
+| 環境変数 | 既定値 | 用途 |
+|---|---|---|
+| `NOMINATIM_URL` | `https://nominatim.openstreetmap.org` | 地名検索 |
+| `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | 周辺検索 |
+| `OSRM_CAR_URL` | `https://router.project-osrm.org` | 車の経路 |
+| `OSRM_FOOT_URL` | `https://routing.openstreetmap.de/routed-foot` | 徒歩の経路 |
+| `OSRM_BIKE_URL` | `https://routing.openstreetmap.de/routed-bike` | 自転車の経路 |
+| `OSM_USER_AGENT` | `geo-home-mcp (https://github.com/takeshy/geo-home-mcp)` | 公開サービスに名乗るUser-Agent |
+
+公開のNominatim・OSRMは1秒1リクエストまでなので、プロセス内で間隔を空けて送ります。多く使う場合は自前の接続先を設定してください。Overpassの混雑や取得失敗はエラーとして返し、「見つからなかった」とは区別します。
 
 ## 実データ
 
