@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "geo-home": {
+    "geo-mcp": {
       "type": "http",
       "url": "https://geo.mcp.takeshy.work/mcp"
     }

@@ -1,4 +1,4 @@
-# Geo Home MCP
+# Geo MCP
 
 自前のOpenStreetMapデータによる施設検索と、車・徒歩・自転車の経路検索。
 
@@ -37,6 +37,8 @@
 `EXTERNAL_FALLBACK_ENABLED=false` で公開地図APIへの実行時依存を止められる。OSMにない施設や営業時間は取得できない。公共交通、リアルタイム渋滞・営業状況には非対応。
 
 ## Cloud Run
+
+リポジトリ・MCPの名称は `geo-mcp` / Geo MCP。既存のGCPリソース名・コンテナ運用設定・配置先パスは互換性のため `geo-home` / `geo-home-mcp` を維持する。
 
 低アクセス向けにMCPと3つのOSRMを別サービスに分け、最小インスタンス数0・リクエスト課金で動かす。SQLite・経路データは非公開GCSの不変リリースに保存する。Cloud SQLや常時稼働VMは不要。
 

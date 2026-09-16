@@ -1,12 +1,12 @@
 {
-  "name": "geo-home-mcp",
+  "name": "geo-mcp",
   "version": "0.1.0",
   "description": "自前のOpenStreetMapデータで施設検索と車・徒歩・自転車の経路検索を提供します。",
   "author": {
     "name": "GemiHub Business"
   },
   "interface": {
-    "displayName": "Geo Home",
+    "displayName": "Geo MCP",
     "shortDescription": "施設検索と車・徒歩・自転車の経路検索",
     "longDescription": "自前のOpenStreetMapデータで施設検索と車・徒歩・自転車の経路検索を提供します。",
     "developerName": "GemiHub Business",

@@ -23,7 +23,7 @@ export function endpointsFromEnv(env: NodeJS.ProcessEnv = process.env): PlaceEnd
     osrmCar: pick("OSRM_CAR_URL", "https://router.project-osrm.org"),
     osrmFoot: pick("OSRM_FOOT_URL", "https://routing.openstreetmap.de/routed-foot"),
     osrmBike: pick("OSRM_BIKE_URL", "https://routing.openstreetmap.de/routed-bike"),
-    userAgent: pick("OSM_USER_AGENT", "geo-home-mcp (https://github.com/takeshy/geo-home-mcp)"),
+    userAgent: pick("OSM_USER_AGENT", "geo-mcp (https://github.com/takeshy/geo-mcp)"),
   };
 }
 

@@ -63,7 +63,7 @@ function point(lat: number | undefined, lng: number | undefined, required = fals
   if (lat === undefined || lng === undefined || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw new PlaceError("緯度・経度を正しい範囲で両方指定してください");
 }
 function permit(h: HybridDeps, reason: FallbackReason) {
-  if (!h.fallbackEnabled) throw new PlaceError("この地域は現在Geo Homeの自前検索対象外です。");
+  if (!h.fallbackEnabled) throw new PlaceError("この地域は現在Geo MCPの自前検索対象外です。");
   if (reason === "local_error" && !h.fallbackOnError) throw new PlaceError("自前地理サービスに接続できませんでした。");
 }
 function annotate(answer: PlaceAnswer, source: "local" | "external", provider: string, reason?: FallbackReason) {

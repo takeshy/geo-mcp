@@ -3,7 +3,7 @@ import { z } from "zod";
 import { PlaceError, placeSearch, route, type PlaceAnswer } from "./places.js";
 
 export function createGeoMcpServer(): McpServer {
-  const server = new McpServer({ name: "geo-home-mcp", version: "0.1.0" });
+  const server = new McpServer({ name: "geo-mcp", version: "0.1.0" });
   server.registerTool(
     "place_search",
     {

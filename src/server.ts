@@ -11,7 +11,7 @@ const httpServer = createServer(async (request, response) => {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
     setCommonHeaders(response);
 
-    if (url.pathname === "/healthz" || url.pathname === "/health") return json(response, 200, { ok: true, service: "geo-home-mcp" });
+    if (url.pathname === "/healthz" || url.pathname === "/health") return json(response, 200, { ok: true, service: "geo-mcp" });
     if (url.pathname === "/mcp") return handleMcp(request, response);
     return json(response, 404, { error: "Not found" });
   } catch (error) {
@@ -24,7 +24,7 @@ const httpServer = createServer(async (request, response) => {
 async function handleMcp(request: IncomingMessage, response: ServerResponse) {
   if (!["GET", "POST", "DELETE"].includes(request.method || "")) return json(response, 405, { error: "Method not allowed" });
   if (!authorize(request.headers.authorization, apiKey)) {
-    response.setHeader("WWW-Authenticate", 'Bearer realm="geo-home-mcp"');
+    response.setHeader("WWW-Authenticate", 'Bearer realm="geo-mcp"');
     return json(response, 401, { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Unauthorized: send Authorization: Bearer <MCP_API_KEY>" } });
   }
   const mcp = createGeoMcpServer();
@@ -51,6 +51,6 @@ function json(response: ServerResponse, status: number, value: unknown) {
 await prepareSnapshot();
 
 httpServer.listen(port, "0.0.0.0", () => {
-  console.log(`Geo Home MCP listening on http://0.0.0.0:${port}`);
+  console.log(`Geo MCP listening on http://0.0.0.0:${port}`);
   if (!(apiKey ?? "").trim()) console.warn("MCP_API_KEY is not set: /mcp accepts unauthenticated requests.");
 });

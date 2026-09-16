@@ -14,10 +14,10 @@ if (url.protocol !== "https:" || url.pathname !== "/mcp" || url.search || url.ha
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 await updateJson(new URL("mcp.json", new URL("../", import.meta.url)), (document) => {
-  document.mcpServers["geo-home"].url = url.href;
+  document.mcpServers["geo-mcp"].url = url.href;
 });
 await updateJson(new URL(".mcp.json", new URL("../", import.meta.url)), (document) => {
-  document.mcpServers["geo-home"].url = url.href;
+  document.mcpServers["geo-mcp"].url = url.href;
 });
 
 console.log(`Configured Agent Plugin MCP endpoint: ${url.href}`);
