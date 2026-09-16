@@ -113,6 +113,7 @@ resource "google_cloud_run_v2_service" "app" {
         value = var.mcp_api_key
       }
       startup_probe {
+        # Internal container probe; public checks use /health (Cloud Run reserves /healthz).
         http_get { path = "/healthz" }
         period_seconds    = 5
         timeout_seconds   = 5

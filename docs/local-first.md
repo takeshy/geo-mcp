@@ -12,7 +12,9 @@
 | geo-osrm-bike | 1 / 4GiB | 0 / 1 | 同上 |
 | geo-osm-update | 8 / 32GiB | ジョブ1タスク | 一時メモリ上で順番に生成 |
 
-4つのHTTPサービスはリクエスト課金。OSRMは公開IAM bindingを持たず、MCPのランタイムSAだけに呼び出しを許可する。外部公開はMCPのBearer認証付き `/mcp`。ヘルスチェック `/healthz` は稼働確認だけを返す。
+4つのHTTPサービスはリクエスト課金。OSRMは公開IAM bindingを持たず、MCPのランタイムSAだけに呼び出しを許可する。外部公開はMCPのBearer認証付き `/mcp`。公開ヘルスチェックは [`/health`](https://geo.mcp.takeshy.work/health) で、稼働確認だけを返す。
+
+Cloud Runの公開URLでは `/healthz` がGoogle側の404になるため、外部からの稼働確認には使わない（[予約URLパスの制約](https://cloud.google.com/run/docs/known-issues#reserved-url-paths)）。Terraformのstartup probeはコンテナへ直接アクセスする内部チェックなので、既存の `/healthz` を利用する。
 
 ## データ
 
