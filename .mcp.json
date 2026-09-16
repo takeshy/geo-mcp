@@ -2,7 +2,7 @@
   "mcpServers": {
     "geo-home": {
       "type": "http",
-      "url": "https://geo-home-mcp-ycqo5pm7gq-an.a.run.app/mcp"
+      "url": "https://geo.mcp.takeshy.work/mcp"
     }
   }
 }

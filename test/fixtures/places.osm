@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version="0.6" generator="geo-home-test">
+  <node id="1" version="1" lat="35.681" lon="139.767"><tag k="name" v="Test Station"/><tag k="name:ja" v="テスト駅"/><tag k="railway" v="station"/></node>
+  <node id="10" version="1" lat="35.6810" lon="139.7670"/>
+  <node id="11" version="1" lat="35.6810" lon="139.7671"/>
+  <node id="12" version="1" lat="35.6811" lon="139.7671"/>
+  <node id="13" version="1" lat="35.6811" lon="139.7670"/>
+  <way id="20" version="1"><nd ref="10"/><nd ref="11"/><nd ref="12"/><nd ref="13"/><nd ref="10"/><tag k="amenity" v="cafe"/><tag k="name" v="テスト喫茶"/><tag k="opening_hours" v="Mo-Fr 09:00-18:00"/></way>
+  <way id="21" version="1"><nd ref="10"/><nd ref="11"/><nd ref="12"/><nd ref="13"/><nd ref="10"/></way>
+  <relation id="30" version="1"><member type="way" ref="21" role="outer"/><tag k="type" v="multipolygon"/><tag k="shop" v="chemist"/><tag k="name" v="テスト薬局"/></relation>
+</osm>

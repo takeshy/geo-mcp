@@ -1,11 +1,13 @@
 locals {
-  bucket_name = var.bucket_name != "" ? var.bucket_name : "${var.project_id}-geo-home"
   required_apis = toset([
     "artifactregistry.googleapis.com",
     "cloudbuild.googleapis.com",
     "iam.googleapis.com",
     "run.googleapis.com",
     "storage.googleapis.com",
+    "compute.googleapis.com",
+    "iap.googleapis.com",
+    "oslogin.googleapis.com",
   ])
   cloud_build_roles = toset([
     "roles/artifactregistry.writer",
@@ -36,7 +38,7 @@ resource "google_artifact_registry_repository" "app" {
 resource "google_service_account" "runtime" {
   project      = var.project_id
   account_id   = "geo-home-run"
-  display_name = "Geo Home Cloud Run"
+  display_name = "Geo Home Runtime"
 
   depends_on = [google_project_service.required]
 }
@@ -63,38 +65,8 @@ resource "google_service_account_iam_member" "cloud_build_uses_runtime" {
   member             = "serviceAccount:${google_service_account.cloud_build.email}"
 }
 
-resource "google_storage_bucket" "data" {
-  project                     = var.project_id
-  name                        = local.bucket_name
-  location                    = upper(var.region)
-  uniform_bucket_level_access = true
-  force_destroy               = false
-
-  cors {
-    origin          = var.cors_origins
-    method          = ["GET", "HEAD"]
-    response_header = ["Content-Type", "Range", "Content-Range", "Accept-Ranges", "ETag"]
-    max_age_seconds = 3600
-  }
-
-  depends_on = [google_project_service.required]
-}
-
-resource "google_storage_bucket_iam_member" "runtime_reader" {
-  bucket = google_storage_bucket.data.name
-  role   = "roles/storage.objectViewer"
-  member = "serviceAccount:${google_service_account.runtime.email}"
-}
-
-resource "google_storage_bucket_iam_member" "public_reader" {
-  count = var.public_tiles ? 1 : 0
-
-  bucket = google_storage_bucket.data.name
-  role   = "roles/storage.objectViewer"
-  member = "allUsers"
-}
-
 resource "google_cloud_run_v2_service" "app" {
+  count               = 1
   project             = var.project_id
   name                = var.service_name
   location            = var.region
@@ -103,75 +75,48 @@ resource "google_cloud_run_v2_service" "app" {
 
   template {
     service_account                  = google_service_account.runtime.email
-    timeout                          = "60s"
-    max_instance_request_concurrency = 40
-
+    timeout                          = "300s"
+    execution_environment            = "EXECUTION_ENVIRONMENT_GEN2"
+    max_instance_request_concurrency = 4
     scaling {
       min_instance_count = 0
-      max_instance_count = 3
+      max_instance_count = 1
     }
-
     containers {
-      image = var.bootstrap_image
-
-      ports {
-        container_port = 8080
-      }
-
+      image = "${local.serverless_registry}/geo-home-mcp:${var.serverless_image_tag}"
+      ports { container_port = 8080 }
       resources {
-        limits = {
-          memory = "512Mi"
-          cpu    = "1"
-        }
-        cpu_idle = true
+        limits            = { memory = "1Gi", cpu = "1" }
+        cpu_idle          = true
+        startup_cpu_boost = false
       }
-
-      env {
-        name  = "GCP_PROJECT_ID"
-        value = var.project_id
-      }
-
-      env {
-        name  = "BASEMAP_STYLE_URL"
-        value = var.basemap_style_url
-      }
-
-      env {
-        name  = "PMTILES_SOURCE_LAYER"
-        value = var.pmtiles_source_layer
-      }
-
       dynamic "env" {
-        for_each = var.mcp_api_key != "" ? [1] : []
+        for_each = {
+          GCP_PROJECT_ID             = var.project_id
+          LOCAL_COVERAGE_FILE        = "/app/config/coverage.json"
+          PLACES_SNAPSHOT_URI        = "gs://${google_storage_bucket.snapshots.name}/${local.active_release}/places.sqlite"
+          LOCAL_OSRM_CAR_URL         = google_cloud_run_v2_service.router["car"].uri
+          LOCAL_OSRM_FOOT_URL        = google_cloud_run_v2_service.router["foot"].uri
+          LOCAL_OSRM_BIKE_URL        = google_cloud_run_v2_service.router["bike"].uri
+          LOCAL_OSRM_AUTH            = "true"
+          EXTERNAL_FALLBACK_ENABLED  = "true"
+          EXTERNAL_FALLBACK_ON_EMPTY = "false"
+          EXTERNAL_FALLBACK_ON_ERROR = "false"
+        }
         content {
-          name  = "MCP_API_KEY"
-          value = var.mcp_api_key
+          name  = env.key
+          value = env.value
         }
       }
-
-      dynamic "env" {
-        for_each = var.land_price_object != "" ? [var.land_price_object] : []
-        content {
-          name  = "LAND_PRICE_DATA_PATH"
-          value = "gs://${google_storage_bucket.data.name}/${env.value}"
-        }
+      env {
+        name  = "MCP_API_KEY"
+        value = var.mcp_api_key
       }
-
-      dynamic "env" {
-        for_each = var.pmtiles_object != "" ? [var.pmtiles_object] : []
-        content {
-          name  = "PMTILES_URL"
-          value = "https://storage.googleapis.com/${google_storage_bucket.data.name}/${env.value}"
-        }
-      }
-
       startup_probe {
-        http_get {
-          path = "/healthz"
-        }
-        initial_delay_seconds = 2
-        period_seconds        = 5
-        failure_threshold     = 6
+        http_get { path = "/healthz" }
+        period_seconds    = 5
+        timeout_seconds   = 5
+        failure_threshold = 48
       }
     }
   }
@@ -181,20 +126,30 @@ resource "google_cloud_run_v2_service" "app" {
       client,
       client_version,
       scaling,
-      template[0].containers[0].image,
     ]
   }
 
   depends_on = [
     google_artifact_registry_repository.app,
-    google_storage_bucket_iam_member.runtime_reader,
+    google_storage_bucket_iam_member.snapshots_reader,
   ]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public" {
+  count    = 1
   project  = var.project_id
-  name     = google_cloud_run_v2_service.app.name
-  location = google_cloud_run_v2_service.app.location
+  name     = google_cloud_run_v2_service.app[0].name
+  location = google_cloud_run_v2_service.app[0].location
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+# Preserve existing Cloud Run resource identities during the migration.
+moved {
+  from = google_cloud_run_v2_service.app
+  to   = google_cloud_run_v2_service.app[0]
+}
+moved {
+  from = google_cloud_run_v2_service_iam_member.public
+  to   = google_cloud_run_v2_service_iam_member.public[0]
 }

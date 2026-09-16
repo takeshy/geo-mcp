@@ -1,0 +1,13 @@
+.git
+.gitignore
+.gcloudignore
+node_modules
+dist
+.env
+.env.*
+terraform
+.codex
+.agents
+
+__pycache__/
+*.pyc

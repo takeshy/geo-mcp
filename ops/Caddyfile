@@ -1,0 +1,8 @@
+{$GEO_DOMAIN} {
+  handle /mcp {
+    reverse_proxy geo-home-mcp:8080
+  }
+  handle {
+    respond 404
+  }
+}

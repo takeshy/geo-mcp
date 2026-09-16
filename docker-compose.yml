@@ -1,0 +1,72 @@
+services:
+  geo-home-mcp:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://geo:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres/geo
+      LOCAL_COVERAGE_FILE: /app/config/coverage.json
+      LOCAL_OSRM_CAR_URL: http://osrm-car:5000
+      LOCAL_OSRM_FOOT_URL: http://osrm-foot:5000
+      LOCAL_OSRM_BIKE_URL: http://osrm-bike:5000
+      MCP_API_KEY: ${MCP_API_KEY:?Set MCP_API_KEY}
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgis/postgis:16-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: geo
+      POSTGRES_DB: geo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - /data/postgres:/var/lib/postgresql/data
+      - ./ops/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U geo -d geo']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  osrm-car:
+    image: ${OSRM_IMAGE:-ghcr.io/project-osrm/osrm-backend:v5.27.1}
+    restart: unless-stopped
+    command: [osrm-routed, --algorithm, mld, /data/current/car/map.osrm]
+    volumes: [/data/osrm:/data:ro]
+  osrm-foot:
+    image: ${OSRM_IMAGE:-ghcr.io/project-osrm/osrm-backend:v5.27.1}
+    restart: unless-stopped
+    command: [osrm-routed, --algorithm, mld, /data/current/foot/map.osrm]
+    volumes: [/data/osrm:/data:ro]
+  osrm-bike:
+    image: ${OSRM_IMAGE:-ghcr.io/project-osrm/osrm-backend:v5.27.1}
+    restart: unless-stopped
+    command: [osrm-routed, --algorithm, mld, /data/current/bike/map.osrm]
+    volumes: [/data/osrm:/data:ro]
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      GEO_DOMAIN: ${GEO_DOMAIN:?Set GEO_DOMAIN}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [geo-home-mcp]
+  osm-import:
+    profiles: [tools]
+    build: ./ops/osm
+    environment:
+      PGHOST: postgres
+      PGDATABASE: geo
+      PGUSER: geo
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - /data/osm:/data/osm:ro
+    command: [/data/osm/map.osm.pbf]
+volumes:
+  caddy_data:
+  caddy_config:

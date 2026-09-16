@@ -1,3 +1,4 @@
+import { hybridPlaceSearch, hybridRoute, runtimeHybrid, type HybridDeps } from "./hybrid.js";
 // Nearby places and road routes from OpenStreetMap services.
 //
 // These answer "what is around here" and "how long to get there" for a
@@ -15,7 +16,7 @@ export interface PlaceEndpoints {
 }
 
 export function endpointsFromEnv(env: NodeJS.ProcessEnv = process.env): PlaceEndpoints {
-  const pick = (name: string, fallback: string) => env[name]?.trim() || fallback;
+  const pick = (name: string, fallback: string) => env[`EXTERNAL_${name}`]?.trim() || env[name]?.trim() || fallback;
   return {
     nominatim: pick("NOMINATIM_URL", "https://nominatim.openstreetmap.org"),
     overpass: pick("OVERPASS_URL", "https://overpass-api.de/api/interpreter"),
@@ -27,6 +28,7 @@ export function endpointsFromEnv(env: NodeJS.ProcessEnv = process.env): PlaceEnd
 }
 
 export interface PlaceDeps {
+  hybrid?: HybridDeps;
   endpoints: PlaceEndpoints;
   fetch: typeof fetch;
   // Waits between retries; tests replace it so they do not sleep.
@@ -34,7 +36,7 @@ export interface PlaceDeps {
 }
 
 export function defaultDeps(): PlaceDeps {
-  return { endpoints: endpointsFromEnv(), fetch: throttledFetch, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) };
+  return { hybrid: runtimeHybrid(), endpoints: endpointsFromEnv(), fetch: throttledFetch, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) };
 }
 
 export interface Link {
@@ -60,7 +62,7 @@ export interface PlaceSearchInput {
   radius?: number;
 }
 
-export async function placeSearch(input: PlaceSearchInput, deps: PlaceDeps = defaultDeps()): Promise<PlaceAnswer> {
+export async function externalPlaceSearch(input: PlaceSearchInput, deps: PlaceDeps = defaultDeps()): Promise<PlaceAnswer> {
   const query = input.query.trim();
   if (!query) throw new PlaceError("検索語がありません");
   if (input.lat === undefined || input.lng === undefined) {
@@ -88,12 +90,14 @@ interface OverpassElement {
 }
 
 // Japanese category words are not OSM tag values (for example ramen).
-const categories: Record<string, [tag: string, value: string]> = {
-  "ラーメン": ["cuisine", "ramen"],
-  "カフェ": ["amenity", "cafe"],
-  "喫茶店": ["amenity", "cafe"],
-  "レストラン": ["amenity", "restaurant"],
-  "コンビニ": ["shop", "convenience"],
+export const categories: Record<string, [tag: string, value: string][]> = {
+  "ラーメン": [["cuisine", "ramen"]],
+  "カフェ": [["amenity", "cafe"]],
+  "喫茶店": [["amenity", "cafe"]],
+  "レストラン": [["amenity", "restaurant"]],
+  "スーパー": [["shop", "supermarket"]],
+  "薬局": [["amenity", "pharmacy"], ["shop", "chemist"]],
+  "コンビニ": [["shop", "convenience"]],
 };
 
 async function around(query: string, at: { lat: number; lng: number }, radius: number, deps: PlaceDeps): Promise<PlaceAnswer> {
@@ -102,8 +106,7 @@ async function around(query: string, at: { lat: number; lng: number }, radius: n
   // model thought to ask for, not a tag the user has to know.
   const pattern = overpassString(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const clauses = ["name", "cuisine", "amenity"].map((tag) => `  nwr(${within})["${tag}"~${pattern},i];`);
-  const category = categories[query];
-  if (category) clauses.push(`  nwr(${within})["${category[0]}"~"(^|;)${category[1]}(;|$)",i];`);
+  for (const category of categories[query] ?? []) clauses.push(`  nwr(${within})["${category[0]}"~"(^|;)${category[1]}(;|$)",i];`);
   const ql = `[out:json][timeout:20];\n(\n${clauses.join("\n")}\n);\nout center 30;`;
 
   const response = await overpassRequest(ql, deps);
@@ -191,7 +194,7 @@ export interface Geocoded {
   lng: number;
 }
 
-async function geocode(query: string, deps: PlaceDeps): Promise<Geocoded[]> {
+export async function geocode(query: string, deps: PlaceDeps): Promise<Geocoded[]> {
   const base = deps.endpoints.nominatim.replace(/\/+$/, "");
   if (!base) throw new PlaceError("地名検索の接続先が設定されていません");
   const url = `${base}/search?q=${encodeURIComponent(query)}&format=json&limit=5&accept-language=ja`;
@@ -208,14 +211,16 @@ async function geocode(query: string, deps: PlaceDeps): Promise<Geocoded[]> {
 export type RouteMode = "driving" | "walking" | "cycling";
 
 export interface RouteInput {
-  to: string;
+  to?: string;
+  toLat?: number;
+  toLng?: number;
   lat: number;
   lng: number;
   mode?: RouteMode;
 }
 
-export async function route(input: RouteInput, deps: PlaceDeps = defaultDeps()): Promise<PlaceAnswer> {
-  const destination = input.to.trim();
+export async function externalRoute(input: RouteInput, deps: PlaceDeps = defaultDeps()): Promise<PlaceAnswer> {
+  const destination = input.to?.trim() || (input.toLat !== undefined ? `${input.toLat},${input.toLng}` : "");
   if (!destination) throw new PlaceError("目的地がありません");
   const mode = input.mode ?? "driving";
   const base = { driving: deps.endpoints.osrmCar, walking: deps.endpoints.osrmFoot, cycling: deps.endpoints.osrmBike }[mode]?.replace(/\/+$/, "");
@@ -226,12 +231,14 @@ export async function route(input: RouteInput, deps: PlaceDeps = defaultDeps()):
     throw new PlaceError("この接続先は車用です。徒歩・自転車に対応した接続先を設定してください");
   }
 
-  const found = (await geocode(destination, deps))[0];
+  const found = input.toLat !== undefined && input.toLng !== undefined ? { name: destination, lat: input.toLat, lng: input.toLng } : (await geocode(destination, deps))[0];
   if (!found) return { text: "目的地が見つかりませんでした。", data: { to: destination, mode, found: false }, links: [] };
 
   const response = await get(`${base}/route/v1/driving/${input.lng},${input.lat};${found.lng},${found.lat}?overview=false`, deps, "経路検索");
   const payload = await response.json() as { code?: string; routes?: Array<{ distance: number; duration: number }> };
   const best = payload.code === "Ok" ? payload.routes?.[0] : undefined;
+  if (payload.code !== "Ok" && payload.code !== "NoRoute") throw new PlaceError("経路検索の結果を読めませんでした");
+  if (best && (![best.distance, best.duration].every(Number.isFinite) || best.distance < 0 || best.duration < 0)) throw new PlaceError("経路検索の距離・時間が不正です");
   if (!best) return { text: "経路が見つかりませんでした。", data: { to: destination, mode, destination: found, found: false }, links: [] };
 
   const minutes = Math.ceil(best.duration / 60);
@@ -262,7 +269,7 @@ async function get(url: string, deps: PlaceDeps, what: string): Promise<Response
 }
 
 // metres is the great-circle distance, which is close enough at city scale.
-function metres(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+export function metres(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
   const radians = (degrees: number) => degrees * Math.PI / 180;
   const dLat = radians(b.lat - a.lat);
   const dLng = radians(b.lng - a.lng);
@@ -285,3 +292,6 @@ const throttledFetch: typeof fetch = async (input, init) => {
   }
   return fetch(input, init);
 };
+
+export const placeSearch = (input: PlaceSearchInput, deps: PlaceDeps = defaultDeps()) => hybridPlaceSearch(input, deps);
+export const route = (input: RouteInput, deps: PlaceDeps = defaultDeps()) => hybridRoute(input, deps);

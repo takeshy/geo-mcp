@@ -2,8 +2,14 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "geo-home-mcp",
   "version": "0.1.0",
-  "description": "地価と公共交通の移動時間から住む場所を比較し、地図で表示します。",
-  "author": { "name": "GemiHub Business" },
+  "description": "自前のOpenStreetMapデータで施設検索と車・徒歩・自転車の経路検索を提供します。",
+  "author": {
+    "name": "GemiHub Business"
+  },
   "license": "MIT",
-  "keywords": ["map", "pmtiles", "land-price", "commute", "home"]
+  "keywords": [
+    "openstreetmap",
+    "places",
+    "routing"
+  ]
 }

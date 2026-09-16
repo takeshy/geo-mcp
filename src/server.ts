@@ -1,46 +1,17 @@
+import { prepareSnapshot } from "./snapshot.js";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { authorize } from "./auth.js";
-import { LandPriceRepository } from "./data.js";
-import { createGeoMcpServer, defaultDestination } from "./mcp.js";
-import { findCandidates } from "./search.js";
+import { createGeoMcpServer } from "./mcp.js";
 
 const port = Number(process.env.PORT || 8080);
 const apiKey = process.env.MCP_API_KEY;
-const repository = new LandPriceRepository();
-const mapPath = fileURLToPath(new URL("../public/map.html", import.meta.url));
-
 const httpServer = createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
     setCommonHeaders(response);
 
     if (url.pathname === "/healthz" || url.pathname === "/health") return json(response, 200, { ok: true, service: "geo-home-mcp" });
-    if (url.pathname === "/" || url.pathname === "/map") {
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      response.end(await readFile(mapPath, "utf8"));
-      return;
-    }
-    if (url.pathname === "/api/demo") {
-      const candidates = await findCandidates(await repository.all(), {
-        destination: defaultDestination,
-        maxCommuteMinutes: 90,
-        maxPricePerSqm: 450_000,
-        maxStationWalkMinutes: 20,
-        limit: 10,
-      });
-      return json(response, 200, {
-        title: "東京駅への通勤圏と地価（デモ）",
-        destination: defaultDestination,
-        candidates,
-        pmtilesUrl: process.env.PMTILES_URL || null,
-        pmtilesSourceLayer: process.env.PMTILES_SOURCE_LAYER || "land-price",
-        basemapStyleUrl: process.env.BASEMAP_STYLE_URL || "https://tiles.openfreemap.org/styles/bright",
-        disclaimer: ["デモデータです。実際の購入判断には使用できません。"],
-      });
-    }
     if (url.pathname === "/mcp") return handleMcp(request, response);
     return json(response, 404, { error: "Not found" });
   } catch (error) {
@@ -56,7 +27,7 @@ async function handleMcp(request: IncomingMessage, response: ServerResponse) {
     response.setHeader("WWW-Authenticate", 'Bearer realm="geo-home-mcp"');
     return json(response, 401, { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Unauthorized: send Authorization: Bearer <MCP_API_KEY>" } });
   }
-  const mcp = createGeoMcpServer(repository);
+  const mcp = createGeoMcpServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   response.on("close", () => {
     void transport.close();
@@ -76,6 +47,8 @@ function json(response: ServerResponse, status: number, value: unknown) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(value));
 }
+
+await prepareSnapshot();
 
 httpServer.listen(port, "0.0.0.0", () => {
   console.log(`Geo Home MCP listening on http://0.0.0.0:${port}`);

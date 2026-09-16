@@ -1,0 +1,18 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: [build, -t, '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/geo-home-mcp:${BUILD_ID}', .]
+  - name: gcr.io/cloud-builders/docker
+    args: [build, -f, ops/cloud-run/Osrm.Dockerfile, -t, '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/osrm:${BUILD_ID}', .]
+  - name: gcr.io/cloud-builders/docker
+    args: [build, -f, ops/cloud-run/Update.Dockerfile, -t, '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/geo-update:${BUILD_ID}', .]
+  - name: gcr.io/cloud-builders/docker
+    args: [run, --rm, --entrypoint, python3, -v, '/workspace/test/fixtures:/fixtures:ro', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/geo-update:${BUILD_ID}', /job/pbf_snapshot.py, /fixtures/places.osm, /tmp/test.sqlite]
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/geo-home-mcp:${BUILD_ID}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/osrm:${BUILD_ID}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/geo-update:${BUILD_ID}'
+options:
+  logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _REGION: asia-northeast1
+  _REPO: geo-home

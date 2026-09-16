@@ -10,17 +10,17 @@ output "region" {
 
 output "cloud_run_url" {
   description = "Geo Home Cloud Run URL."
-  value       = google_cloud_run_v2_service.app.uri
+  value       = try(google_cloud_run_v2_service.app[0].uri, null)
 }
 
 output "mcp_url" {
   description = "Streamable HTTP MCP endpoint."
-  value       = "${google_cloud_run_v2_service.app.uri}/mcp"
+  value       = var.domain != "" ? "https://${var.domain}/mcp" : "${google_cloud_run_v2_service.app[0].uri}/mcp"
 }
 
-output "bucket_name" {
-  description = "GCS bucket for land-price JSON and PMTiles."
-  value       = google_storage_bucket.data.name
+output "snapshot_bucket" {
+  description = "Private immutable OSM snapshot bucket."
+  value       = google_storage_bucket.snapshots.name
 }
 
 output "artifact_repository_id" {
@@ -38,3 +38,5 @@ output "mcp_api_key" {
   value       = var.mcp_api_key
   sensitive   = true
 }
+
+output "snapshot_release" { value = local.active_release }

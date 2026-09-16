@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const endpoint = process.argv[2]?.trim();
 if (!endpoint) {
-  console.error("Usage: node scripts/configure-plugin-url.mjs https://SERVICE.run.app/mcp");
+  console.error("Usage: node scripts/configure-plugin-url.mjs https://geo.example.com/mcp");
   process.exit(1);
 }
 

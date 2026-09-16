@@ -10,3 +10,9 @@ coverage/
 terraform/terraform.tfvars
 terraform/backend.tf
 crash.log
+
+__pycache__/
+
+.env.compute
+
+terraform/*.auto.tfvars.json

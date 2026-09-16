@@ -1,22 +1,22 @@
 {
   "name": "geo-home-mcp",
   "version": "0.1.0",
-  "description": "地価と公共交通の移動時間から住む場所を比較し、インタラクティブ地図で表示します。",
+  "description": "自前のOpenStreetMapデータで施設検索と車・徒歩・自転車の経路検索を提供します。",
   "author": {
     "name": "GemiHub Business"
   },
-  "skills": "./skills/",
   "interface": {
     "displayName": "Geo Home",
-    "shortDescription": "地価と通勤時間で住む場所を発見",
-    "longDescription": "地価、駅徒歩、公共交通の移動時間を比較し、候補地域を根拠付きの地図として表示します。",
+    "shortDescription": "施設検索と車・徒歩・自転車の経路検索",
+    "longDescription": "自前のOpenStreetMapデータで施設検索と車・徒歩・自転車の経路検索を提供します。",
     "developerName": "GemiHub Business",
     "category": "Data",
-    "capabilities": ["Interactive", "Maps", "Analysis"],
+    "capabilities": [
+      "Maps"
+    ],
     "defaultPrompt": [
-      "東京駅45分以内で地価が割安な地域を地図で見せて。",
-      "候補地域を地価と通勤時間で比較して。",
-      "勤務地までの移動負担が少ない居住エリアを探して。"
+      "東京駅の周辺でカフェを探して。",
+      "川崎駅から横浜駅まで徒歩で何分？"
     ]
   },
   "mcpServers": "./.mcp.json"

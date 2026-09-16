@@ -1,204 +1,63 @@
 # Geo Home MCP
 
-地価、駅徒歩、公共交通の移動時間から居住候補地域を比較し、PMTiles対応のインタラクティブ地図を表示するStreamable HTTP MCPサーバーです。
+自前のOpenStreetMapデータによる施設検索と、車・徒歩・自転車の経路検索。
 
-## 含まれるもの
+## Endpoint
 
-- Cloud Run向けMCPサーバー (`/mcp`)
-- `list_layers`, `get_land_price`, `compute_commute`, `find_candidate_areas`, `compare_areas`, `build_area_map`
-- `place_search`（周辺の店と営業時間）, `route`（車・徒歩・自転車の所要時間）
-- MCP Appとして表示できるMapLibre地図
-- GCS上のPMTilesと地価JSONの読み込み
-- オープンデータから事前計算した公共交通時間（未収録の目的地は明示付きデモ推定）
-- GemiHub Business Agent PluginとCodex Pluginのmanifest
+`https://geo.mcp.takeshy.work/mcp`
 
-## ローカル起動
+既存のMCP_API_KEYをBearerトークンとして利用する。
 
-```bash
-npm install
-npm run dev
-```
+## Tools
 
-- 地図: http://localhost:8080/map
-- MCP: http://localhost:8080/mcp
-- Health check: http://localhost:8080/health
-
-初期状態は `data/land-prices.demo.json` を使用します。この値はUI・ツール動作確認専用です。
-
-## 周辺検索と経路
-
-`place_search` と `route` はOpenStreetMapのサービスを呼びます。位置は呼び出し側が `lat` / `lng` で渡します（サーバーは利用者の現在地を知りません）。`place_search` は位置がなければ名前検索になり、`route` は位置が必須です。
-
-| 環境変数 | 既定値 | 用途 |
-|---|---|---|
-| `NOMINATIM_URL` | `https://nominatim.openstreetmap.org` | 地名検索 |
-| `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | 周辺検索 |
-| `OSRM_CAR_URL` | `https://router.project-osrm.org` | 車の経路 |
-| `OSRM_FOOT_URL` | `https://routing.openstreetmap.de/routed-foot` | 徒歩の経路 |
-| `OSRM_BIKE_URL` | `https://routing.openstreetmap.de/routed-bike` | 自転車の経路 |
-| `OSM_USER_AGENT` | `geo-home-mcp (https://github.com/takeshy/geo-home-mcp)` | 公開サービスに名乗るUser-Agent |
-
-公開のNominatim・OSRMは1秒1リクエストまでなので、プロセス内で間隔を空けて送ります。多く使う場合は自前の接続先を設定してください。Overpassの混雑や取得失敗はエラーとして返し、「見つからなかった」とは区別します。
-
-## 実データ
-
-`LAND_PRICE_DATA_PATH` にローカルJSONまたは `gs://bucket/object.json` を指定します。Cloud Runのサービスアカウントには対象オブジェクトの `storage.objects.get` を付与してください。JSONの配列要素は次の形です。
+- `place_search`: 施設名、カテゴリ、周辺検索。距離順、営業時間、住所を返す。
+- `route`: 車 (`driving`)、徒歩 (`walking`)、自転車 (`cycling`) の距離・所要時間。
 
 ```json
-{
-  "id": "unique-id",
-  "area": "地域名",
-  "station": "最寄駅",
-  "municipality": "自治体",
-  "lat": 35.6812,
-  "lng": 139.7671,
-  "pricePerSqm": 1000000,
-  "previousPricePerSqm": 950000,
-  "stationWalkMinutes": 8,
-  "source": "国土交通省 不動産情報ライブラリ",
-  "sourceUrl": "https://www.reinfolib.mlit.go.jp/",
-  "observedAt": "2026-01-01",
-  "commuteProfiles": [
-    {
-      "destination": "東京駅",
-      "lat": 35.6812,
-      "lng": 139.7671,
-      "durationMinutes": 35,
-      "transfers": 1,
-      "source": "GTFS等からの事前計算",
-      "observedAt": "2026-01-01"
-    }
-  ]
-}
+{"query":"カフェ","lat":35.681,"lng":139.767,"radius":1200}
 ```
-
-国土交通省APIの利用申請・利用条件を確認し、ETLでこの正規化形式へ変換してください。公示地価、基準地価、実取引価格は意味が異なるため、同一系列として混ぜないでください。本番では `series` などの列を追加して別レイヤー化することを推奨します。公共交通時間はGTFSなど再配布条件を確認できるオープンデータから事前計算し、出典と観測日を `commuteProfiles` に保持します。PMTilesは地価・候補地点の地図配信に使い、経路計算結果はこのJSONプロファイルから参照します。
-
-## PMTiles
-
-`.pmtiles` をCloud Storageへアップロードし、CORSで `Range` リクエストを許可した配信URLを `PMTILES_URL` に設定します。ベクトルタイル内のsource layer名を `PMTILES_SOURCE_LAYER` に指定してください。
-
-同梱デモデータからPMTilesを生成してTerraform管理のGCSバケットへ配置する場合:
-
-```bash
-gcloud builds submit \
-  --region=asia-northeast1 \
-  --config=cloudbuild-data.yaml \
-  --service-account="projects/PROJECT_ID/serviceAccounts/geo-home-build@PROJECT_ID.iam.gserviceaccount.com" \
-  .
-```
-
-このビルドはGeoJSONを生成し、tippecanoe 2.29.0で `land-price` source layerのPMTilesへ変換します。
-
-例となるCORS設定:
 
 ```json
-[
-  {
-    "origin": ["https://YOUR_APP.example.com"],
-    "method": ["GET", "HEAD"],
-    "responseHeader": ["Content-Type", "Range", "Content-Range", "Accept-Ranges"],
-    "maxAgeSeconds": 3600
-  }
-]
+{"lat":35.531,"lng":139.697,"to":"東京駅","mode":"walking"}
 ```
 
-機密性が不要な地図タイルは公開読み取り＋CDN、テナント固有データは認証付きRange proxyを推奨します。
+目的地は `toLat` / `toLng` でも指定可能。地価・公共交通・住宅比較のデモ機能は削除済み。
 
-## Google Cloudインフラ
+## Local First
 
-Geo Home専用GCPプロジェクトで自己完結する構成です。
+対応地域は [config/coverage.json](config/coverage.json) で設定する。初期範囲は東京本土・神奈川の近似Bounding Box。東京都の島しょ部などを網羅する行政境界ではない。
 
-- Project: `terraform.tfvars` で指定する専用プロジェクト
-- Region: `asia-northeast1`（変更可能）
-- Artifact Registry: `geo-home`
-- Cloud Run runtime SA: `geo-home-run`
-- Cloud Build SA: `geo-home-build`
-- Terraform root module: `terraform/`
-- Cloud Run service: `geo-home-mcp`
-- GCS bucket: `${project_id}-geo-home`（上書き可能）
+- 対応地域: 自前SQLiteスナップショット（PostGISも選択可能）と自前OSRM
+- 未対応地域: Overpass / Nominatim / 公開OSRM
+- 名称検索: 自前データで見つからないときだけNominatim
+- 経路検索: 両端が対応地域内の場合だけ自前OSRM
 
-Terraformが次を管理します。
+結果には `source`、`provider`、外部利用時の `fallbackReason` を付ける。自前検索が0件でも通常は外部へ問い合わせない。
 
-- Cloud Runサービス、スケーリング、health check、公開Invoker
-- GCSバケット、PMTiles用CORS、Cloud Run読み取り権限
-- 地価JSONとPMTilesのCloud Run環境変数
+`EXTERNAL_FALLBACK_ENABLED=false` で公開地図APIへの実行時依存を止められる。OSMにない施設や営業時間は取得できない。公共交通、リアルタイム渋滞・営業状況には非対応。
 
-Cloud RunのコンテナイメージだけはTerraformの `ignore_changes` 対象です。既存メインサービスと同様、Terraformがインフラ、Cloud Buildがアプリケーションイメージを管理します。
+## Cloud Run
 
-### 1. インフラを作成
+低アクセス向けにMCPと3つのOSRMを別サービスに分け、最小インスタンス数0・リクエスト課金で動かす。SQLite・経路データは非公開GCSの不変リリースに保存する。Cloud SQLや常時稼働VMは不要。
 
-GCPプロジェクトを作成して課金アカウントへ接続した後、Terraform変数を設定します。プロジェクト作成自体をTerraformへ含めないことで、組織・Folder・Billing Accountのbootstrap権限とサービス用stateを分離しています。
+OSRMはIAM認証でMCPからのみ利用する。MCPには `Authorization: Bearer <MCP_API_KEY>` が必要。コールドスタートには待ち時間がある。
 
-```hcl
-project_id = "your-geo-home-project-id"
-region     = "asia-northeast1"
+構成・移行・更新・予算の詳細: [運用手順](docs/local-first.md)。
 
-bucket_name         = "your-geo-home-project-id-geo-home"
-public_tiles        = true
-cors_origins        = ["https://YOUR_GEMIBIZ_DOMAIN"]
-land_price_object   = "land-prices.json"
-pmtiles_object      = "land-price.pmtiles"
-pmtiles_source_layer = "land-price"
+## Development
+
+Node.js 22.17以降、SQLiteスナップショットのテストにはPython 3.11以降が必要。
+
+```sh
+npm ci
+cp .env.example .env
+npm run typecheck
+npm test
+npm run build
 ```
 
-オブジェクト名とSecret IDは、実データをまだ用意しない場合は空のままで構いません。その場合、組み込みデモデータと推定移動時間で起動します。
+環境変数は実行環境から渡す（`.env` はComposeが読み込む。Node単体では `--env-file` を使う）。`LOCAL_PLACES_SQLITE` を指定すると `DATABASE_URL` より優先する。
 
-```bash
-cp terraform/terraform.tfvars.example terraform/terraform.tfvars
-# terraform/terraform.tfvars を編集
-terraform -chdir=terraform init
-terraform -chdir=terraform plan
-terraform -chdir=terraform apply
-```
+## Attribution
 
-初回Terraform applyではCloud Run公式helloイメージを使い、まだ存在しないGeo Homeイメージへの循環依存を避けます。
-
-### 2. アプリケーションをデプロイ
-
-Geo Home MCPリポジトリのルートから実行します。
-
-```bash
-./scripts/deploy.sh
-```
-
-スクリプトはこのリポジトリのTerraform outputからプロジェクト、リージョン、Artifact Registry、Cloud Build専用SAを取得してCloud Buildを実行します。Cloud Buildは作成済みCloud Runサービスのイメージだけを更新します。デプロイ後にCloud Run URLを取得し、`mcp.json` と `.mcp.json` の接続先も自動更新します。更新された2ファイルはGitへcommitしてからAgent Pluginをインストールしてください。
-
-別環境へ出す場合だけ `GEO_PROJECT_ID`、`GEO_REGION`、`GEO_SERVICE` を上書きできます。ただしCloud Build側の `_PROJECT_ID` なども `--substitutions` で一致させてください。
-
-## Plugin接続先の更新
-
-デプロイ後、発行されたCloud Run URLを次の2ファイルへ設定します。
-
-- `mcp.json`: GemiHub Business Agent Plugin用（`streamable-http`）
-- `.mcp.json`: Codex Plugin用（`http`）
-
-現在の `geo-home-mcp.example.com` は安全なplaceholderです。`scripts/deploy.sh` がデプロイ後に実URLへ更新します。GemiHub Businessでは、更新をGitHubへpushした後にrepositoryをAgent Plugin設定画面からpreview・installします。インストール時に `tools/list` が自動実行されるため、通常はそのままチャットで利用できます。警告が表示された場合だけ、**Settings > MCP Servers** の接続テストで再試行してください。
-
-チャット内で地図カードを表示するには、`find_candidate_areas` の後に `build_area_map` を呼び出します。`build_area_map` は `_meta.ui.resourceUri` と候補を含む `structuredContent` を返し、GemiHub BusinessがPMTiles/MapLibre製のインタラクティブなMCP Appとして新しいアシスタントメッセージに表示します。修正前に保存済みの回答へカードを後付けすることはできないため、その場合は検索を再実行してください。
-
-手動でURLだけ設定する場合:
-
-```bash
-node scripts/configure-plugin-url.mjs https://YOUR_SERVICE_URL/mcp
-```
-
-## セキュリティ（APIキー認証）
-
-MCPクライアントから到達できるよう、TerraformはCloud Run Invokerを `allUsers` に付与し、認証はアプリ側で行います。
-`MCP_API_KEY` を設定すると、`/mcp` は `Authorization: Bearer <MCP_API_KEY>` を持つリクエストだけを受け付け、
-それ以外は 401 を返します。`/health`、`/map`、`/api/demo` は引き続き公開です。未設定なら `/mcp` は開いたままで、起動ログに警告が出ます。
-
-```bash
-openssl rand -hex 32          # 生成した値を terraform/terraform.tfvars の mcp_api_key に書く
-terraform -chdir=terraform apply
-terraform -chdir=terraform output -raw mcp_api_key   # クライアントへ配る
-```
-
-クライアント側の設定例です。
-
-- kakeratta: `infra/link-geo-home.sh` がこのリポジトリのTerraform outputからURLとキーを読み、`KAKERATTA_MCP_SERVERS` の `headers.Authorization` に入れます。
-- `.mcp.json`（Codex Plugin）: サーバー定義に `"headers": { "Authorization": "Bearer <MCP_API_KEY>" }` を追加します。
-- `mcp.json`（GemiHub Business）: Agent Plugin設定画面のMCPサーバー認証ヘッダーに同じ値を設定します。
-
-キーはGitへcommitしないでください。`mcp.json` と `.mcp.json` にはURLだけを置きます。
+© OpenStreetMap contributors. [ODbL / attribution](https://www.openstreetmap.org/copyright).

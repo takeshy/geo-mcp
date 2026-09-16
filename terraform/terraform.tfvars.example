@@ -1,15 +1,13 @@
 project_id = "your-geo-home-project-id"
-region     = "asia-northeast1"
-
-# Replace * with the GemiHub Business and Codex web origins in production.
-cors_origins = ["*"]
-public_tiles = true
-
-# Leave empty for the built-in demo, then set these after uploading data.
-land_price_object    = ""
-pmtiles_object       = "land-price.pmtiles"
-pmtiles_source_layer = "land-price"
-
-# Shared secret for /mcp. Generate with: openssl rand -hex 32
-# Every client (kakeratta, Agent Plugins) sends it as Authorization: Bearer <key>.
+region = "asia-northeast1"
+domain = "geo.example.com"
+# Generate a secret with: openssl rand -hex 32
 mcp_api_key = ""
+# Build with cloudbuild-serverless.yaml, then use its build ID.
+serverless_image_tag = "YOUR_BUILD_ID"
+# Leave empty to use serverless_image_tag for the updater as well.
+update_image_tag = ""
+# Initial deployment: immutable release already uploaded to the snapshot bucket.
+# After current.json exists, leave empty to follow successful weekly publications.
+snapshot_release = ""
+enable_weekly_update = false
