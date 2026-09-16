@@ -2,26 +2,74 @@
 
 自前のOpenStreetMapデータによる施設検索と、車・徒歩・自転車の経路検索。
 
-## Endpoint
-
-`https://geo.mcp.takeshy.work/mcp`
-
-既存のMCP_API_KEYをBearerトークンとして利用する。
-
 ## Tools
 
 - `place_search`: 施設名、カテゴリ、周辺検索。距離順、営業時間、住所を返す。
 - `route`: 車 (`driving`)、徒歩 (`walking`)、自転車 (`cycling`) の距離・所要時間。
 
+以下は自前データを利用した場合の入出力例。施設名・座標・距離・所要時間などは説明用のサンプル。応答はMCPの `structuredContent` 部分を示す（`content` には説明文と参照リンクも返る）。
+
+### place_search
+
+入力:
+
 ```json
 {"query":"カフェ","lat":35.681,"lng":139.767,"radius":1200}
 ```
+
+応答例:
+
+```json
+{
+  "query": "カフェ",
+  "mode": "nearby",
+  "center": { "lat": 35.681, "lng": 139.767 },
+  "radiusMetres": 1200,
+  "places": [
+    {
+      "name": "サンプルカフェ",
+      "lat": 35.682,
+      "lng": 139.768,
+      "distanceMetres": 143,
+      "kind": "cafe",
+      "openingHours": "Mo-Su 08:00-20:00",
+      "address": "東京都千代田区丸の内"
+    }
+  ],
+  "source": "local",
+  "provider": "openstreetmap"
+}
+```
+
+`distanceMetres` は検索位置からの直線距離（メートル）。営業時間・住所などはOSMに登録がある場合に返る。該当施設がない場合は `places` が空配列になる。
+
+### route
+
+入力:
 
 ```json
 {"lat":35.531,"lng":139.697,"to":"東京駅","mode":"walking"}
 ```
 
-目的地は `toLat` / `toLng` でも指定可能。地価・公共交通・住宅比較のデモ機能は削除済み。
+目的地は `toLat` / `toLng` でも指定可能。
+
+応答例:
+
+```json
+{
+  "to": "東京駅",
+  "mode": "walking",
+  "origin": { "lat": 35.531, "lng": 139.697 },
+  "destination": { "name": "東京駅", "lat": 35.681, "lng": 139.767 },
+  "durationMinutes": 252,
+  "distanceKm": 21,
+  "source": "local",
+  "provider": "openstreetmap",
+  "geocoding": { "source": "local", "provider": "openstreetmap" }
+}
+```
+
+`durationMinutes` は所要時間（分）、`distanceKm` は経路の距離（キロメートル）。`geocoding` は目的地を名前で検索した際の情報で、座標を直接指定した場合は省略される。
 
 ## Local First
 
