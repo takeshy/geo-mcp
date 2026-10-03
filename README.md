@@ -1,30 +1,32 @@
 # Geo MCP
 
-自前のOpenStreetMapデータによる施設検索と、車・徒歩の経路検索。
+English | [日本語](README_ja.md)
+
+Place search using self-hosted OpenStreetMap data, plus driving and walking directions.
 
 ## Tools
 
-- `reverse_geocode`: 緯度・経度から世界の最寄りの町・村と直線距離を返す。自前GeoNames索引のみを使い、外部APIには接続しない。
-- `place_search`: 施設名、カテゴリ、周辺検索。距離順、営業時間、住所を返す。
-- `route`: 車 (`driving`)、徒歩 (`walking`) の距離・所要時間。
+- `reverse_geocode`: Returns the nearest town or village worldwide and its straight-line distance from the supplied latitude and longitude. Uses only a self-hosted GeoNames index, with no external API calls.
+- `place_search`: Searches by place name, category, or proximity. Returns results sorted by distance, along with opening hours and addresses.
+- `route`: Returns distance and travel time for driving (`driving`) and walking (`walking`).
 
-以下は自前データを利用した場合の入出力例。施設名・座標・距離・所要時間などは説明用のサンプル。応答はMCPの `structuredContent` 部分を示す（`content` には説明文と参照リンクも返る）。
+The examples below show inputs and outputs when using self-hosted data. Place names, coordinates, distances, and travel times are illustrative. Responses show the MCP `structuredContent` field (`content` also includes explanatory text and reference links).
 
 ### reverse_geocode
 
-入力: `{"lat":35.6812,"lng":139.7671,"language":"ja"}`。`language` は `ja`（日本語）または `en`（英語）で、省略時は `en`。指定は地名に適用され、説明文は日本語のまま。
+Input: `{"lat":35.6812,"lng":139.7671,"language":"ja"}`. `language` accepts `ja` (Japanese) or `en` (English), and defaults to `en`. This setting applies to place names; explanatory text remains in Japanese.
 
-GeoNamesに登録された居住地から最寄りを検索し、「地名付近」と登録地点までの距離を返す。人口による下限は設けず、小さな町・村も対象とする。歴史上の集落・廃村・地区単位のデータは除外する。GeoNames の指定言語の alternate name があれば優先し、なければ元の `name` を使う（例: `大豆戸町付近です。`）。表示テキストに国コードは付けず、`structuredContent.place.countryCode` は保持する。
+Searches for the nearest populated place in GeoNames and returns a “near [place name]” description and the distance to its registered coordinates. There is no minimum population threshold, so small towns and villages are included. Historical settlements, abandoned settlements, and district-level records are excluded. The GeoNames alternate name in the requested language takes priority; otherwise, the original `name` is used (for example, `大豆戸町付近です。`). Display text omits the country code, while `structuredContent.place.countryCode` is retained.
 
-`structuredContent` は `found`、`approximate: true`、`method: "nearest_settlement"`、`source: "local"`、`provider: "geonames"` を含む。見つかった場合の `place` は `name`、`countryCode`、`admin1Code`（州・県のコード）、`lat`、`lng`、`geonameId`、`distanceMetres` を含む。`place.administrativeAreas` は対応する行政区の `level`（1〜4）、`geonameId`、指定言語の `name` を含む。市・区など（ADM2〜4）が収録されていれば表示に添える（例: `横浜市港北区大豆戸町付近です。`）。未収録の階層は省略する。100km以内に登録地点がなければ `found: false`。データ未配置や破損は検索結果なしとは区別してエラーにする。
+`structuredContent` includes `found`, `approximate: true`, `method: "nearest_settlement"`, `source: "local"`, and `provider: "geonames"`. When a place is found, `place` includes `name`, `countryCode`, `admin1Code` (state or prefecture code), `lat`, `lng`, `geonameId`, and `distanceMetres`. `place.administrativeAreas` includes the corresponding administrative areas’ `level` (1–4), `geonameId`, and `name` in the requested language. City, ward, and other administrative names (ADM2–4) are added to the display when available (for example, `横浜市港北区大豆戸町付近です。`). Missing levels are omitted. If no registered place is found within 100 km, the response contains `found: false`. Missing or corrupt data produces an error, distinct from an empty search result.
 
-行政区域や国境の内外は判定しないため、隣の自治体・国の地名が返る場合がある。居住地の完全な網羅や正確性は保証しない。
+The search does not check administrative or national boundaries, so it may return a place in a neighboring municipality or country. Complete coverage and accuracy of settlement data are not guaranteed.
 
-#### 地名データの準備
+#### Preparing place-name data
 
-日英名追加前の2026-10-03取得データの索引は4,998,967件、約601MiB。検索索引はディスクから必要な部分を読み、全件をメモリには展開しない。
+The index built from data downloaded on 2026-10-03, before adding Japanese and English names, contains 4,998,967 records and is approximately 601 MiB. Searches read the required portions of the index from disk rather than loading all records into memory.
 
-Python 3.11以降で一度だけ索引を作成する。ダウンロードは準備時だけで、実行時の通信・APIキーは不要。
+Build the index once using Python 3.11 or later. Downloads are required only during preparation; runtime network access and API keys are not needed.
 
 ```sh
 mkdir -p data/geonames
@@ -33,21 +35,21 @@ curl -fL https://download.geonames.org/export/dump/alternateNamesV2.zip -o data/
 python3 scripts/import-geonames.py data/geonames/allCountries.zip --alternate-names data/geonames/alternateNamesV2.zip
 ```
 
-取り込み時は居住地の日英名を最大1つずつ `settlements.name_ja` と `settlements.name_en` に保存する。行政区（ADM1〜4）の名称と日英名は `administrative_areas` に保存し、居住地の行政区コードで対応づける。歴史名・空の名前を除外し、preferred name、非口語名、非短縮名、alternateNameId の順で選ぶ。既存索引も読み込めるが、日英名・行政区名を利用するには両ZIPから再作成が必要。
+During import, at most one Japanese and one English name per settlement are stored in `settlements.name_ja` and `settlements.name_en`. Administrative area names (ADM1–4), including Japanese and English variants, are stored in `administrative_areas` and matched using each settlement’s administrative codes. Historical and empty names are excluded. Selection prioritizes preferred names, non-colloquial names, non-abbreviated names, and then alternateNameId. Existing indexes remain readable, but must be rebuilt from both ZIP files to use Japanese, English, and administrative area names.
 
-生成物 `data/geonames/settlements.sqlite` はGit管理外。Dockerイメージのビルド前にも作成が必要で、イメージにはSQLiteだけを同梱する。ローカル実行の配置先は `LOCAL_SETTLEMENTS_SQLITE` で変更できる。更新時も上記手順で作り直し、サーバーを再起動する。出典・ライセンス・生成日時・入力ZIPのSHA-256は索引の `metadata` テーブルに記録する。`EXTERNAL_FALLBACK_ENABLED=false` でもこのツールは利用可能。
+The generated `data/geonames/settlements.sqlite` is not tracked by Git. It must also be created before building the Docker image; only the SQLite file is bundled in the image. For local execution, its path can be overridden with `LOCAL_SETTLEMENTS_SQLITE`. To update the data, repeat the steps above and restart the server. The index’s `metadata` table records the source, license, generation time, and SHA-256 hashes of the input ZIP files. This tool is also available with `EXTERNAL_FALLBACK_ENABLED=false`.
 
-データ: [GeoNames](https://www.geonames.org/)、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)。配布データから居住地を抽出し検索索引に加工。[配布形式と出典](https://download.geonames.org/export/dump/readme.txt)。
+Data: [GeoNames](https://www.geonames.org/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Settlements are extracted from the distributed data and converted into a search index. [Distribution format and sources](https://download.geonames.org/export/dump/readme.txt).
 
 ### place_search
 
-入力:
+Input:
 
 ```json
 {"query":"カフェ","lat":35.681,"lng":139.767,"radius":1200}
 ```
 
-応答例:
+Example response:
 
 ```json
 {
@@ -71,19 +73,19 @@ python3 scripts/import-geonames.py data/geonames/allCountries.zip --alternate-na
 }
 ```
 
-`distanceMetres` は検索位置からの直線距離（メートル）。営業時間・住所などはOSMに登録がある場合に返る。該当施設がない場合は `places` が空配列になる。
+`distanceMetres` is the straight-line distance from the search location in meters. Opening hours, addresses, and similar details are returned when available in OSM. If no matching places are found, `places` is an empty array.
 
 ### route
 
-入力:
+Input:
 
 ```json
 {"lat":35.531,"lng":139.697,"to":"東京駅","mode":"walking"}
 ```
 
-目的地は `toLat` / `toLng` でも指定可能。
+The destination can also be specified using `toLat` / `toLng`.
 
-応答例:
+Example response:
 
 ```json
 {
@@ -99,38 +101,38 @@ python3 scripts/import-geonames.py data/geonames/allCountries.zip --alternate-na
 }
 ```
 
-`durationMinutes` は所要時間（分）、`distanceKm` は経路の距離（キロメートル）。`geocoding` は目的地を名前で検索した際の情報で、座標を直接指定した場合は省略される。
+`durationMinutes` is the travel time in minutes, and `distanceKm` is the route distance in kilometers. `geocoding` describes the destination lookup by name and is omitted when coordinates are supplied directly.
 
 ## Local First
 
-対応地域は [config/coverage.json](config/coverage.json) で設定する。初期範囲は東京本土・神奈川の近似Bounding Box。東京都の島しょ部などを網羅する行政境界ではない。
+Coverage is configured in [config/coverage.json](config/coverage.json). The default coverage is an approximate bounding box for mainland Tokyo and Kanagawa, not an administrative boundary covering all of Tokyo’s islands or other outlying areas.
 
-- 対応地域: 自前SQLiteスナップショット（PostGISも選択可能）と自前OSRM
-- 未対応地域: Overpass / Nominatim / 公開OSRM
-- 名称検索: 自前データで見つからないときだけNominatim
-- 経路検索: 両端が対応地域内の場合だけ自前OSRM
+- Inside coverage: self-hosted SQLite snapshots (PostGIS is also supported) and self-hosted OSRM
+- Outside coverage: Overpass / Nominatim / public OSRM
+- Name lookup: Nominatim only when no match is found in self-hosted data
+- Routing: self-hosted OSRM only when both endpoints are inside coverage
 
-結果には `source`、`provider`、外部利用時の `fallbackReason` を付ける。自前検索が0件でも通常は外部へ問い合わせない。
+Results include `source`, `provider`, and, when an external service is used, `fallbackReason`. An empty local search result does not normally trigger an external request.
 
-`EXTERNAL_FALLBACK_ENABLED=false` で公開地図APIへの実行時依存を止められる。OSMにない施設や営業時間は取得できない。公共交通、リアルタイム渋滞・営業状況には非対応。
+Set `EXTERNAL_FALLBACK_ENABLED=false` to disable runtime dependencies on public map APIs. Places and opening hours missing from OSM cannot be retrieved. Public transit, real-time traffic, and live business status are not supported.
 
 ## Cloud Run
 
-リポジトリ・MCPの名称は `geo-mcp` / Geo MCP。既存のGCPリソース名・コンテナ運用設定・配置先パスは互換性のため `geo-home` / `geo-home-mcp` を維持する。
+The repository and MCP are named `geo-mcp` / Geo MCP. Existing GCP resource names, container deployment settings, and installation paths retain `geo-home` / `geo-home-mcp` for compatibility.
 
-低アクセス向けにMCPと2つのOSRMを別サービスに分け、最小インスタンス数0・リクエスト課金で動かす。SQLite・経路データは非公開GCSの不変リリースに保存する。Cloud SQLや常時稼働VMは不要。
+For low-traffic workloads, the MCP server and two OSRM instances run as separate services with zero minimum instances and request-based billing. SQLite and routing data are stored as immutable releases in private GCS storage. Cloud SQL and always-on VMs are not required.
 
-OSRMはIAM認証でMCPからのみ利用する。クライアントはAPI GatewayのMCP URLへ `X-API-Key: <専用Google APIキー>` を送る。Gatewayは `/mcp` のGET/POST/DELETEだけを公開し、URLとキーを検証してからIAM認証付きでMCP本体を呼ぶ。Cloud Run本体への直接アクセスは公開しない。コールドスタートには待ち時間がある。
+OSRM uses IAM authentication and is accessible only from the MCP server. Clients send `X-API-Key: <dedicated Google API key>` to the API Gateway MCP URL. The gateway exposes only GET/POST/DELETE on `/mcp`, validates the URL and key, and calls the MCP service with IAM authentication. Direct access to the Cloud Run service is not public. Cold starts add latency.
 
-接続先は `terraform -chdir=terraform output -raw gateway_url`、キーは `terraform -chdir=terraform output -raw gateway_api_key` で確認できる。ローカル開発では従来の `MCP_API_KEY` によるBearer認証も利用できる。
+Retrieve the endpoint with `terraform -chdir=terraform output -raw gateway_url` and the key with `terraform -chdir=terraform output -raw gateway_api_key`. Local development also supports the existing Bearer authentication using `MCP_API_KEY`.
 
-地図データは必要なときだけ手動更新する。週次の自動更新は停止している。実行方法は運用手順を参照。
+Map data is updated manually as needed. Weekly automatic updates are disabled. See the operations guide for instructions.
 
-構成・移行・更新・予算の詳細: [運用手順](docs/local-first.md)。
+For configuration, migration, updates, and budget details, see the [operations guide](docs/local-first.md) (Japanese).
 
 ## Development
 
-Node.js 22.17以降、SQLiteスナップショットのテストにはPython 3.11以降が必要。
+Node.js 22.17 or later is required. SQLite snapshot tests also require Python 3.11 or later.
 
 ```sh
 npm ci
@@ -140,7 +142,7 @@ npm test
 npm run build
 ```
 
-環境変数は実行環境から渡す（`.env` はComposeが読み込む。Node単体では `--env-file` を使う）。`LOCAL_PLACES_SQLITE` を指定すると `DATABASE_URL` より優先する。
+Supply environment variables through the runtime environment (Compose reads `.env`; when running Node directly, use `--env-file`). When set, `LOCAL_PLACES_SQLITE` takes precedence over `DATABASE_URL`.
 
 ## Attribution
 
