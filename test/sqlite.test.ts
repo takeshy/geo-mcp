@@ -45,6 +45,11 @@ test('MCP exposes reverse_geocode, place_search and route', async () => {
     assert.deepEqual(tools.map(t => t.name).sort(), ['place_search', 'reverse_geocode', 'route']);
     const reverse = tools.find(t => t.name === 'reverse_geocode')!;
     assert.deepEqual(reverse.inputSchema.required, ['lat', 'lng']);
+    const language = reverse.inputSchema.properties!.language as { enum: string[], default: string };
+    assert.deepEqual(language.enum, ['ja', 'en']);
+    assert.equal(language.default, 'en');
+    const invalidLanguage = await client.callTool({ name: 'reverse_geocode', arguments: { lat: 35, lng: 139, language: 'jp' } });
+    assert.equal(invalidLanguage.isError, true);
     const invalid = await client.callTool({ name: 'reverse_geocode', arguments: { lat: 91, lng: 139 } });
     assert.equal(invalid.isError, true);
     const mode = tools.find(t => t.name === 'route')!.inputSchema.properties!.mode as { enum: string[] };

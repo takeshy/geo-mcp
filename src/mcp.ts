@@ -12,6 +12,7 @@ export function createGeoMcpServer(): McpServer {
       inputSchema: {
         lat: z.number().min(-90).max(90).describe("調べる位置の緯度"),
         lng: z.number().min(-180).max(180).describe("調べる位置の経度"),
+        language: z.enum(["ja", "en"]).default("en").describe("地名の言語。ja: 日本語、en: 英語（既定）。未収録なら元の名前"),
       },
     },
     async (input) => placeResult(async () => reverseGeocode(input)),

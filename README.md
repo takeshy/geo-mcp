@@ -12,25 +12,28 @@
 
 ### reverse_geocode
 
-入力: `{"lat":35.6812,"lng":139.7671}`
+入力: `{"lat":35.6812,"lng":139.7671,"language":"ja"}`。`language` は `ja`（日本語）または `en`（英語）で、省略時は `en`。指定は地名に適用され、説明文は日本語のまま。
 
-GeoNamesに登録された居住地から最寄りを検索し、「地名（国コード）付近」と登録地点までの距離を返す。人口による下限は設けず、小さな町・村も対象とする。歴史上の集落・廃村・地区単位のデータは除外する。名称は収録名で、日本語とは限らない。
+GeoNamesに登録された居住地から最寄りを検索し、「地名付近」と登録地点までの距離を返す。人口による下限は設けず、小さな町・村も対象とする。歴史上の集落・廃村・地区単位のデータは除外する。GeoNames の指定言語の alternate name があれば優先し、なければ元の `name` を使う（例: `大豆戸町付近です。`）。表示テキストに国コードは付けず、`structuredContent.place.countryCode` は保持する。
 
-`structuredContent` は `found`、`approximate: true`、`method: "nearest_settlement"`、`source: "local"`、`provider: "geonames"` を含む。見つかった場合の `place` は `name`、`countryCode`、`admin1Code`（州・県のコード）、`lat`、`lng`、`geonameId`、`distanceMetres` を含む。100km以内に登録地点がなければ `found: false`。データ未配置や破損は検索結果なしとは区別してエラーにする。
+`structuredContent` は `found`、`approximate: true`、`method: "nearest_settlement"`、`source: "local"`、`provider: "geonames"` を含む。見つかった場合の `place` は `name`、`countryCode`、`admin1Code`（州・県のコード）、`lat`、`lng`、`geonameId`、`distanceMetres` を含む。`place.administrativeAreas` は対応する行政区の `level`（1〜4）、`geonameId`、指定言語の `name` を含む。市・区など（ADM2〜4）が収録されていれば表示に添える（例: `横浜市港北区大豆戸町付近です。`）。未収録の階層は省略する。100km以内に登録地点がなければ `found: false`。データ未配置や破損は検索結果なしとは区別してエラーにする。
 
 行政区域や国境の内外は判定しないため、隣の自治体・国の地名が返る場合がある。居住地の完全な網羅や正確性は保証しない。
 
 #### 地名データの準備
 
-2026-10-03取得データの索引は4,998,967件、約601MiB。検索索引はディスクから必要な部分を読み、全件をメモリには展開しない。
+日英名追加前の2026-10-03取得データの索引は4,998,967件、約601MiB。検索索引はディスクから必要な部分を読み、全件をメモリには展開しない。
 
 Python 3.11以降で一度だけ索引を作成する。ダウンロードは準備時だけで、実行時の通信・APIキーは不要。
 
 ```sh
 mkdir -p data/geonames
 curl -fL https://download.geonames.org/export/dump/allCountries.zip -o data/geonames/allCountries.zip
-python3 scripts/import-geonames.py data/geonames/allCountries.zip
+curl -fL https://download.geonames.org/export/dump/alternateNamesV2.zip -o data/geonames/alternateNamesV2.zip
+python3 scripts/import-geonames.py data/geonames/allCountries.zip --alternate-names data/geonames/alternateNamesV2.zip
 ```
+
+取り込み時は居住地の日英名を最大1つずつ `settlements.name_ja` と `settlements.name_en` に保存する。行政区（ADM1〜4）の名称と日英名は `administrative_areas` に保存し、居住地の行政区コードで対応づける。歴史名・空の名前を除外し、preferred name、非口語名、非短縮名、alternateNameId の順で選ぶ。既存索引も読み込めるが、日英名・行政区名を利用するには両ZIPから再作成が必要。
 
 生成物 `data/geonames/settlements.sqlite` はGit管理外。Dockerイメージのビルド前にも作成が必要で、イメージにはSQLiteだけを同梱する。ローカル実行の配置先は `LOCAL_SETTLEMENTS_SQLITE` で変更できる。更新時も上記手順で作り直し、サーバーを再起動する。出典・ライセンス・生成日時・入力ZIPのSHA-256は索引の `metadata` テーブルに記録する。`EXTERNAL_FALLBACK_ENABLED=false` でもこのツールは利用可能。
 
