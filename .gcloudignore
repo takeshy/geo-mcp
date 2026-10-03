@@ -2,6 +2,8 @@
 .gitignore
 .gcloudignore
 node_modules
+data/geonames/*.zip
+data/geonames/*.building.sqlite
 dist
 .env
 .env.*

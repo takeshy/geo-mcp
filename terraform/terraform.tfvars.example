@@ -8,6 +8,9 @@ serverless_image_tag = "YOUR_BUILD_ID"
 # Leave empty to use serverless_image_tag for the updater as well.
 update_image_tag = ""
 # Initial deployment: immutable release already uploaded to the snapshot bucket.
-# After current.json exists, leave empty to follow successful weekly publications.
+# After current.json exists, leave empty to follow successful publications.
 snapshot_release = ""
+# Manual map updates; leave the automatic weekly schedule disabled.
 enable_weekly_update = false
+# Keep the Cloud Run backend private; clients use API Gateway.
+allow_direct_mcp_access = false

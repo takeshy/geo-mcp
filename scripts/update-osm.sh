@@ -14,10 +14,9 @@ release="releases/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "/data/osrm/$release"
 curl --fail --location --retry 3 "$OSM_PBF_URL" -o /data/osm/map.osm.pbf.next
 mv /data/osm/map.osm.pbf.next /data/osm/map.osm.pbf
-for mode in car foot bike; do
+for mode in car foot; do
   echo "Building OSRM $mode for $release"
   profile="$mode"
-  if [ "$mode" = bike ]; then profile=bicycle; fi
   directory="/data/osrm/$release/$mode"
   mkdir -p "$directory"
   cp --reflink=auto /data/osm/map.osm.pbf "$directory/map.osm.pbf"
@@ -29,7 +28,7 @@ done
 elif [ "$#" -eq 2 ] && [ "$1" = --resume-release ]; then
   release="$2"
   [[ "$release" =~ ^releases/[0-9]{8}T[0-9]{6}Z$ ]] || { echo "Invalid release path" >&2; exit 1; }
-  for mode in car foot bike; do
+  for mode in car foot; do
     directory="/data/osrm/$release/$mode"
     test -s "$directory/map.osrm.partition"
     test -s "$directory/map.osrm.cell_metrics"
@@ -50,7 +49,7 @@ recover() {
   if [ "$switched" = true ] && [ -n "$previous" ]; then
     ln -s "$previous" /data/osrm/rollback
     mv -Tf /data/osrm/rollback /data/osrm/current
-    docker compose up -d --force-recreate osrm-car osrm-foot osrm-bike
+    docker compose up -d --force-recreate osrm-car osrm-foot
   fi
   docker compose start geo-home-mcp
 }
@@ -59,9 +58,9 @@ docker compose stop geo-home-mcp
 ln -s "$release" /data/osrm/next
 mv -Tf /data/osrm/next /data/osrm/current
 switched=true
-docker compose up -d --force-recreate osrm-car osrm-foot osrm-bike
+docker compose up -d --force-recreate osrm-car osrm-foot
 # Test each routing graph from the internal network before publishing POIs.
-for service in osrm-car osrm-foot osrm-bike; do
+for service in osrm-car osrm-foot; do
   ready=false
   for attempt in $(seq 1 60); do
     if docker compose run --rm --no-deps -T geo-home-mcp node -e '

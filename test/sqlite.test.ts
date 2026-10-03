@@ -35,12 +35,19 @@ test('portable snapshot supports Japanese names, category OR, hours, radius and 
   } finally { provider.close(); rmSync(dir, { recursive: true }); }
 });
 
-test('MCP exposes only place_search and route', async () => {
+test('MCP exposes reverse_geocode, place_search and route', async () => {
   const server = createGeoMcpServer();
   const client = new Client({ name: 'test', version: '1' });
   const [a, b] = InMemoryTransport.createLinkedPair();
   try {
     await Promise.all([server.connect(a), client.connect(b)]);
-    assert.deepEqual((await client.listTools()).tools.map(t => t.name).sort(), ['place_search', 'route']);
+    const tools = (await client.listTools()).tools;
+    assert.deepEqual(tools.map(t => t.name).sort(), ['place_search', 'reverse_geocode', 'route']);
+    const reverse = tools.find(t => t.name === 'reverse_geocode')!;
+    assert.deepEqual(reverse.inputSchema.required, ['lat', 'lng']);
+    const invalid = await client.callTool({ name: 'reverse_geocode', arguments: { lat: 91, lng: 139 } });
+    assert.equal(invalid.isError, true);
+    const mode = tools.find(t => t.name === 'route')!.inputSchema.properties!.mode as { enum: string[] };
+    assert.deepEqual(mode.enum, ['driving', 'walking']);
   } finally { await client.close(); await server.close(); }
 });

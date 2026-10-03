@@ -78,7 +78,7 @@ def main():
         run('python3', '/job/pbf_snapshot.py', str(source), str(work/'places.sqlite'))
         upload(work/'places.sqlite', release+'/places.sqlite')
         (work/'places.sqlite').unlink()
-        for mode, profile in [('car','car'), ('foot','foot'), ('bike','bicycle')]:
+        for mode, profile in [('car','car'), ('foot','foot')]:
             graph = work/mode
             graph.mkdir()
             os.link(source, graph/'map.osm.pbf')
@@ -106,8 +106,8 @@ def main():
             for path in sorted(graph.glob('map.osrm*')):
                 upload(path, release+'/osrm/'+mode+'/'+path.name)
             shutil.rmtree(graph)
-        # All artifacts and all three local route probes passed before deployment.
-        for mode in ['car','foot','bike']:
+        # All artifacts and both local route probes passed before deployment.
+        for mode in ['car','foot']:
             name = 'geo-osrm-'+mode
             old = api('GET', f'{API}/services/{name}')['template']
             old.pop('revision', None)

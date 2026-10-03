@@ -32,7 +32,7 @@ variable "snapshot_release" {
 }
 variable "serverless_image_tag" {
   type    = string
-  default = "0b26d96e-1c6b-439e-8a4e-0a4ddc77fd17"
+  default = "7fda98c7-03de-4819-8723-f3e21e1c8bd7"
 }
 data "google_storage_bucket_object_content" "current_snapshot" {
   count  = var.snapshot_release == "" ? 1 : 0
@@ -44,7 +44,7 @@ locals {
   serverless_registry = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_repository_id}"
 }
 resource "google_cloud_run_v2_service" "router" {
-  for_each            = toset(["car", "foot", "bike"])
+  for_each            = toset(["car", "foot"])
   name                = "geo-osrm-${each.key}"
   location            = var.region
   deletion_protection = false
@@ -100,7 +100,7 @@ resource "google_cloud_run_v2_service_iam_member" "router_invoker" {
   member   = "serviceAccount:${google_service_account.runtime.email}"
 }
 
-# The updater can deploy only the four existing services, using the runtime identity.
+# The updater can deploy only the three existing services, using the runtime identity.
 resource "google_cloud_run_v2_service_iam_member" "updater_router" {
   for_each = google_cloud_run_v2_service.router
   project  = var.project_id
@@ -134,7 +134,7 @@ resource "google_artifact_registry_repository_iam_member" "updater_images" {
 }
 variable "update_image_tag" {
   type    = string
-  default = "0cc3f961-de1c-4d47-af08-afdd7851b5a2"
+  default = "7fda98c7-03de-4819-8723-f3e21e1c8bd7"
 }
 resource "google_cloud_run_v2_job" "update" {
   name                = "geo-osm-update"
@@ -167,10 +167,11 @@ resource "google_cloud_run_v2_job" "update" {
   }
   depends_on = [google_cloud_run_v2_service_iam_member.updater_app, google_cloud_run_v2_service_iam_member.updater_router, google_project_iam_member.updater_operations]
 }
-# Remain paused until the complete update has been measured against the budget.
+# Map updates are manual by default; enable scheduling only when explicitly requested.
 variable "enable_weekly_update" {
-  type    = bool
-  default = false
+  description = "Enable automatic weekly map updates. Keep false for manual operation."
+  type        = bool
+  default     = false
 }
 resource "google_project_service" "scheduler" {
   service            = "cloudscheduler.googleapis.com"

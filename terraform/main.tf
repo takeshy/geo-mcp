@@ -8,6 +8,10 @@ locals {
     "compute.googleapis.com",
     "iap.googleapis.com",
     "oslogin.googleapis.com",
+    "apigateway.googleapis.com",
+    "servicemanagement.googleapis.com",
+    "servicecontrol.googleapis.com",
+    "apikeys.googleapis.com",
   ])
   cloud_build_roles = toset([
     "roles/artifactregistry.writer",
@@ -71,6 +75,7 @@ resource "google_cloud_run_v2_service" "app" {
   name                = var.service_name
   location            = var.region
   ingress             = "INGRESS_TRAFFIC_ALL"
+  custom_audiences    = ["https://${var.domain}"]
   deletion_protection = false
 
   template {
@@ -97,7 +102,6 @@ resource "google_cloud_run_v2_service" "app" {
           PLACES_SNAPSHOT_URI        = "gs://${google_storage_bucket.snapshots.name}/${local.active_release}/places.sqlite"
           LOCAL_OSRM_CAR_URL         = google_cloud_run_v2_service.router["car"].uri
           LOCAL_OSRM_FOOT_URL        = google_cloud_run_v2_service.router["foot"].uri
-          LOCAL_OSRM_BIKE_URL        = google_cloud_run_v2_service.router["bike"].uri
           LOCAL_OSRM_AUTH            = "true"
           EXTERNAL_FALLBACK_ENABLED  = "true"
           EXTERNAL_FALLBACK_ON_EMPTY = "false"
@@ -111,6 +115,10 @@ resource "google_cloud_run_v2_service" "app" {
       env {
         name  = "MCP_API_KEY"
         value = var.mcp_api_key
+      }
+      env {
+        name  = "MCP_GATEWAY_API_KEY"
+        value = google_apikeys_key.mcp.key_string
       }
       startup_probe {
         # Internal container probe; public checks use /health (Cloud Run reserves /healthz).
@@ -137,7 +145,7 @@ resource "google_cloud_run_v2_service" "app" {
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public" {
-  count    = 1
+  count    = var.allow_direct_mcp_access ? 1 : 0
   project  = var.project_id
   name     = google_cloud_run_v2_service.app[0].name
   location = google_cloud_run_v2_service.app[0].location

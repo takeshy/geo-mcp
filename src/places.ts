@@ -11,7 +11,6 @@ export interface PlaceEndpoints {
   overpass: string;
   osrmCar: string;
   osrmFoot: string;
-  osrmBike: string;
   userAgent: string;
 }
 
@@ -22,7 +21,6 @@ export function endpointsFromEnv(env: NodeJS.ProcessEnv = process.env): PlaceEnd
     overpass: pick("OVERPASS_URL", "https://overpass-api.de/api/interpreter"),
     osrmCar: pick("OSRM_CAR_URL", "https://router.project-osrm.org"),
     osrmFoot: pick("OSRM_FOOT_URL", "https://routing.openstreetmap.de/routed-foot"),
-    osrmBike: pick("OSRM_BIKE_URL", "https://routing.openstreetmap.de/routed-bike"),
     userAgent: pick("OSM_USER_AGENT", "geo-mcp (https://github.com/takeshy/geo-mcp)"),
   };
 }
@@ -208,7 +206,7 @@ export async function geocode(query: string, deps: PlaceDeps): Promise<Geocoded[
   });
 }
 
-export type RouteMode = "driving" | "walking" | "cycling";
+export type RouteMode = "driving" | "walking";
 
 export interface RouteInput {
   to?: string;
@@ -223,12 +221,12 @@ export async function externalRoute(input: RouteInput, deps: PlaceDeps = default
   const destination = input.to?.trim() || (input.toLat !== undefined ? `${input.toLat},${input.toLng}` : "");
   if (!destination) throw new PlaceError("目的地がありません");
   const mode = input.mode ?? "driving";
-  const base = { driving: deps.endpoints.osrmCar, walking: deps.endpoints.osrmFoot, cycling: deps.endpoints.osrmBike }[mode]?.replace(/\/+$/, "");
+  const base = { driving: deps.endpoints.osrmCar, walking: deps.endpoints.osrmFoot }[mode]?.replace(/\/+$/, "");
   if (!base) throw new PlaceError("指定した移動手段の経路検索の接続先が設定されていません");
   // OSRM profiles belong to the prepared data, not the URL profile token.
   // Refuse the known car-only public endpoint for non-car modes.
   if (mode !== "driving" && new URL(base).hostname.toLowerCase() === "router.project-osrm.org") {
-    throw new PlaceError("この接続先は車用です。徒歩・自転車に対応した接続先を設定してください");
+    throw new PlaceError("この接続先は車用です。徒歩に対応した接続先を設定してください");
   }
 
   const found = input.toLat !== undefined && input.toLng !== undefined ? { name: destination, lat: input.toLat, lng: input.toLng } : (await geocode(destination, deps))[0];
@@ -243,8 +241,8 @@ export async function externalRoute(input: RouteInput, deps: PlaceDeps = default
 
   const minutes = Math.ceil(best.duration / 60);
   const km = Math.round(best.distance / 100) / 10;
-  const label = { driving: "車", walking: "徒歩", cycling: "自転車" }[mode];
-  const engine = { driving: "car", walking: "foot", cycling: "bike" }[mode];
+  const label = { driving: "車", walking: "徒歩" }[mode];
+  const engine = { driving: "car", walking: "foot" }[mode];
   // The routing service knows roads, not timetables. Saying which question was
   // answered is the difference between a useful number and a wrong one.
   return {

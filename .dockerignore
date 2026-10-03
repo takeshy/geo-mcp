@@ -1,4 +1,6 @@
 node_modules
+data/geonames/*.zip
+data/geonames/*.building.sqlite
 dist
 .git
 .env*

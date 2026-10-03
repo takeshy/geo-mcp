@@ -1,7 +1,7 @@
 import { prepareSnapshot } from "./snapshot.js";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { authorize } from "./auth.js";
+import { authorizeRequest } from "./auth.js";
 import { createGeoMcpServer } from "./mcp.js";
 
 const port = Number(process.env.PORT || 8080);
@@ -23,7 +23,7 @@ const httpServer = createServer(async (request, response) => {
 
 async function handleMcp(request: IncomingMessage, response: ServerResponse) {
   if (!["GET", "POST", "DELETE"].includes(request.method || "")) return json(response, 405, { error: "Method not allowed" });
-  if (!authorize(request.headers.authorization, apiKey)) {
+  if (!authorizeRequest(request.headers, apiKey, process.env.MCP_GATEWAY_API_KEY)) {
     response.setHeader("WWW-Authenticate", 'Bearer realm="geo-mcp"');
     return json(response, 401, { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Unauthorized: send Authorization: Bearer <MCP_API_KEY>" } });
   }

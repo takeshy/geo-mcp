@@ -30,7 +30,7 @@ export class OsrmRouteProvider implements RouteProvider {
       headers.forEach((value, key) => merged.set(key, value));
       return deps.fetch(url, { ...init, headers: merged, signal: AbortSignal.timeout(240_000) });
     };
-    return externalRoute(input, { ...deps, fetch: localFetch, endpoints: { ...deps.endpoints, osrmCar: this.url, osrmFoot: this.url, osrmBike: this.url } });
+    return externalRoute(input, { ...deps, fetch: localFetch, endpoints: { ...deps.endpoints, osrmCar: this.url, osrmFoot: this.url } });
   }
 }
 let runtime: HybridDeps | undefined;
@@ -43,7 +43,7 @@ export function runtimeHybrid(): HybridDeps {
     return env[key] === "true";
   };
   const routes: HybridDeps["routes"] = {};
-  for (const [mode, key] of [["driving", "CAR"], ["walking", "FOOT"], ["cycling", "BIKE"]] as const) {
+  for (const [mode, key] of [["driving", "CAR"], ["walking", "FOOT"]] as const) {
     const url = env[`LOCAL_OSRM_${key}_URL`]?.trim();
     if (url) routes[mode] = new OsrmRouteProvider(url, flag("LOCAL_OSRM_AUTH", false));
   }
@@ -120,11 +120,11 @@ export class RouteResolver {
     point(input.lat, input.lng, true);
     point(input.toLat, input.toLng);
     const mode = input.mode ?? "driving";
-    if (!["driving", "walking", "cycling"].includes(mode)) throw new PlaceError("移動手段が不正です");
+    if (!["driving", "walking"].includes(mode)) throw new PlaceError("移動手段が不正です");
     const h = this.deps.hybrid ?? disabled;
     // Preserve the existing early configuration check when local routing is disabled.
-    const externalUrl = { driving: this.deps.endpoints.osrmCar, walking: this.deps.endpoints.osrmFoot, cycling: this.deps.endpoints.osrmBike }[mode];
-    if (!h.routes?.[mode] && mode !== "driving" && externalUrl && new URL(externalUrl).hostname === "router.project-osrm.org") throw new PlaceError("この接続先は車用です。徒歩・自転車に対応した接続先を設定してください");
+    const externalUrl = { driving: this.deps.endpoints.osrmCar, walking: this.deps.endpoints.osrmFoot }[mode];
+    if (!h.routes?.[mode] && mode !== "driving" && externalUrl && new URL(externalUrl).hostname === "router.project-osrm.org") throw new PlaceError("この接続先は車用です。徒歩に対応した接続先を設定してください");
     let destination: Place;
     let geocoding: Record<string, unknown> | undefined;
     if (input.toLat !== undefined) destination = { name: input.to?.trim() || `${input.toLat},${input.toLng}`, lat: input.toLat, lng: input.toLng! };

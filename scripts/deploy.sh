@@ -12,6 +12,9 @@ GEO_BUILD_ID="$(gcloud builds submit --project="$GEO_PROJECT_ID" --config=cloudb
 # GCS current.json supplies the last successfully published dataset release.
 terraform -chdir=terraform plan -var="serverless_image_tag=$GEO_BUILD_ID" -var="update_image_tag=$GEO_BUILD_ID" -out=/tmp/geo-home-deploy.tfplan
 terraform -chdir=terraform apply /tmp/geo-home-deploy.tfplan
+# Keep the public MCP entry point on the custom domain only.
+# The pinned Terraform provider does not expose default_uri_disabled.
+gcloud run services update geo-home-mcp --project="$GEO_PROJECT_ID" --region="$(terraform -chdir=terraform output -raw region)" --no-default-url
 # Persist the image version so later Terraform operations do not roll it back.
 python3 - "$GEO_BUILD_ID" <<'PY'
 import json, sys

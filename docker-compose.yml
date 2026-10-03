@@ -8,7 +8,6 @@ services:
       LOCAL_COVERAGE_FILE: /app/config/coverage.json
       LOCAL_OSRM_CAR_URL: http://osrm-car:5000
       LOCAL_OSRM_FOOT_URL: http://osrm-foot:5000
-      LOCAL_OSRM_BIKE_URL: http://osrm-bike:5000
       MCP_API_KEY: ${MCP_API_KEY:?Set MCP_API_KEY}
     volumes:
       - ./config:/app/config:ro
@@ -39,11 +38,6 @@ services:
     image: ${OSRM_IMAGE:-ghcr.io/project-osrm/osrm-backend:v5.27.1}
     restart: unless-stopped
     command: [osrm-routed, --algorithm, mld, /data/current/foot/map.osrm]
-    volumes: [/data/osrm:/data:ro]
-  osrm-bike:
-    image: ${OSRM_IMAGE:-ghcr.io/project-osrm/osrm-backend:v5.27.1}
-    restart: unless-stopped
-    command: [osrm-routed, --algorithm, mld, /data/current/bike/map.osrm]
     volumes: [/data/osrm:/data:ro]
   caddy:
     image: caddy:2.10-alpine

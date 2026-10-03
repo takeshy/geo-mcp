@@ -34,11 +34,17 @@ variable "mcp_api_key" {
 }
 
 variable "domain" {
-  description = "Owned hostname for the Cloud Run HTTPS endpoint."
+  description = "Existing Cloud Run domain mapping used for authenticated Gateway backend calls."
   type        = string
   default     = ""
   validation {
-    condition     = var.domain == "" || can(regex("^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$", var.domain))
-    error_message = "domain must be a hostname without a scheme, path or port."
+    condition     = can(regex("^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$", var.domain))
+    error_message = "Set the existing backend hostname without a scheme, path or port."
   }
+}
+
+variable "allow_direct_mcp_access" {
+  description = "Temporary migration option. Keep false so clients must use API Gateway."
+  type        = bool
+  default     = false
 }

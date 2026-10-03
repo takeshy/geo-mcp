@@ -15,7 +15,7 @@ output "cloud_run_url" {
 
 output "mcp_url" {
   description = "Streamable HTTP MCP endpoint."
-  value       = var.domain != "" ? "https://${var.domain}/mcp" : "${google_cloud_run_v2_service.app[0].uri}/mcp"
+  value       = "https://${google_api_gateway_gateway.mcp.default_hostname}/mcp"
 }
 
 output "snapshot_bucket" {
@@ -34,7 +34,7 @@ output "cloud_build_service_account_email" {
 }
 
 output "mcp_api_key" {
-  description = "Bearer token MCP clients must send. Read with: terraform output -raw mcp_api_key"
+  description = "Legacy Bearer token for local development and migration. Production clients use gateway_api_key."
   value       = var.mcp_api_key
   sensitive   = true
 }

@@ -3,7 +3,7 @@ import test from "node:test";
 import { BoundingBoxCoverage } from "../src/coverage.js";
 import { OsrmRouteProvider, type HybridDeps, type Place } from "../src/hybrid.js";
 import { LocalPlaceProvider } from "../src/local-places.js";
-import { endpointsFromEnv, placeSearch, route, type PlaceDeps } from "../src/places.js";
+import { endpointsFromEnv, placeSearch, route, type PlaceDeps, type RouteMode } from "../src/places.js";
 const tokyo = { lat: 35.68, lng: 139.76 };
 const osaka = { lat: 34.69, lng: 135.50 };
 const coverage = new BoundingBoxCoverage([{ name: "test", west: 139, east: 140, south: 35, north: 36 }]);
@@ -11,7 +11,7 @@ const cafe: Place = { ...tokyo, name: "喫茶店", openingHours: "Mo-Fr 09:00-18
 function fixture(options: Partial<HybridDeps> = {}) {
   const calls: string[] = [];
   const logs: Record<string, unknown>[] = [];
-  const hybrid: HybridDeps = { coverage, places: { search: async () => [cafe] }, routes: Object.fromEntries(["driving", "walking", "cycling"].map(m => [m, new OsrmRouteProvider(`http://${m}.local:5000`)])), fallbackEnabled: true, fallbackOnEmpty: false, fallbackOnError: false, log: r => logs.push(r), ...options };
+  const hybrid: HybridDeps = { coverage, places: { search: async () => [cafe] }, routes: Object.fromEntries(["driving", "walking"].map(m => [m, new OsrmRouteProvider(`http://${m}.local:5000`)])), fallbackEnabled: true, fallbackOnEmpty: false, fallbackOnError: false, log: r => logs.push(r), ...options };
   const deps: PlaceDeps = { hybrid, endpoints: endpointsFromEnv({}), sleep: async () => {}, fetch: (async (url) => {
     calls.push(String(url));
     return new Response(JSON.stringify(String(url).includes("/route/") ? { code: "Ok", routes: [{ distance: 100, duration: 60 }] } : String(url).includes("/search?") ? [{ display_name: "大阪", lat: String(osaka.lat), lon: String(osaka.lng) }] : { elements: [] }), { status: 200 });
@@ -74,7 +74,7 @@ test("master switch blocks all external paths, including destination geocoding",
   await assert.rejects(route({ ...tokyo, toLat: osaka.lat, toLng: osaka.lng }, f.deps), /自前検索対象外/);
   assert.deepEqual(f.calls, []);
 });
-for (const mode of ["driving", "walking", "cycling"] as const) {
+for (const mode of ["driving", "walking"] as const) {
   test(`${mode} uses local graph for two covered endpoints and public graph for cross-region route`, async () => {
     const f = fixture();
     const local = await route({ ...tokyo, toLat: 35.5, toLng: 139.5, mode }, f.deps);
@@ -139,4 +139,10 @@ test("an uncovered origin also selects the external router", async () => {
   const f = fixture();
   const answer = await route({ ...osaka, toLat: tokyo.lat, toLng: tokyo.lng }, f.deps);
   assert.equal(answer.data.fallbackReason, "outside_coverage");
+});
+
+test("removed cycling mode fails before any provider call", async () => {
+  const f = fixture();
+  await assert.rejects(route({ ...tokyo, toLat: tokyo.lat, toLng: tokyo.lng, mode: "cycling" as RouteMode }, f.deps), /移動手段が不正/);
+  assert.deepEqual(f.calls, []);
 });

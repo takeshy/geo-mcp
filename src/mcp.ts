@@ -1,9 +1,21 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { reverseGeocode } from "./reverse-geocode.js";
 import { PlaceError, placeSearch, route, type PlaceAnswer } from "./places.js";
 
 export function createGeoMcpServer(): McpServer {
   const server = new McpServer({ name: "geo-mcp", version: "0.1.0" });
+  server.registerTool(
+    "reverse_geocode",
+    {
+      description: "緯度・経度から世界の最寄りの町・村と距離を返す（自前GeoNamesデータ、外部API不要）。100km以内の登録居住地による概略で、行政区域への所属は判定しない。国境や市町村境界付近では隣の地域が返る場合がある。",
+      inputSchema: {
+        lat: z.number().min(-90).max(90).describe("調べる位置の緯度"),
+        lng: z.number().min(-180).max(180).describe("調べる位置の経度"),
+      },
+    },
+    async (input) => placeResult(async () => reverseGeocode(input)),
+  );
   server.registerTool(
     "place_search",
     {
@@ -28,7 +40,7 @@ export function createGeoMcpServer(): McpServer {
         to: z.string().min(1).max(200).optional().describe("目的地の名前。例: 渋谷駅"),
         lat: z.number().min(-90).max(90).describe("出発位置の緯度（北緯）"),
         lng: z.number().min(-180).max(180).describe("出発位置の経度（東経）"),
-        mode: z.enum(["driving", "walking", "cycling"]).optional().describe("移動手段。既定driving"),
+        mode: z.enum(["driving", "walking"]).optional().describe("移動手段。既定driving"),
       },
     },
     async (input) => placeResult(() => route(input)),

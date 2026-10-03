@@ -3,7 +3,7 @@
   "mcpServers": {
     "geo-mcp": {
       "type": "streamable-http",
-      "url": "https://geo.mcp.takeshy.work/mcp"
+      "url": "https://geo-mcp-37047ftd.an.gateway.dev/mcp"
     }
   }
 }
