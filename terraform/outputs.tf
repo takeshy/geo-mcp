@@ -15,7 +15,7 @@ output "cloud_run_url" {
 
 output "mcp_url" {
   description = "Streamable HTTP MCP endpoint."
-  value       = "https://${google_api_gateway_gateway.mcp.default_hostname}/mcp"
+  value       = var.enable_gateway ? "https://${google_api_gateway_gateway.mcp[0].default_hostname}/mcp" : "https://${var.domain}/mcp"
 }
 
 output "snapshot_bucket" {

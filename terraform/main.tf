@@ -100,9 +100,10 @@ resource "google_cloud_run_v2_service" "app" {
           GCP_PROJECT_ID             = var.project_id
           LOCAL_COVERAGE_FILE        = "/app/config/coverage.json"
           PLACES_SNAPSHOT_URI        = "gs://${google_storage_bucket.snapshots.name}/${local.active_release}/places.sqlite"
-          LOCAL_OSRM_CAR_URL         = google_cloud_run_v2_service.router["car"].uri
-          LOCAL_OSRM_FOOT_URL        = google_cloud_run_v2_service.router["foot"].uri
+          LOCAL_OSRM_CAR_URL         = var.enable_routes ? google_cloud_run_v2_service.router["car"].uri : ""
+          LOCAL_OSRM_FOOT_URL        = var.enable_routes ? google_cloud_run_v2_service.router["foot"].uri : ""
           LOCAL_OSRM_AUTH            = "true"
+          GEO_ROUTES_ENABLED         = tostring(var.enable_routes)
           EXTERNAL_FALLBACK_ENABLED  = "true"
           EXTERNAL_FALLBACK_ON_EMPTY = "false"
           EXTERNAL_FALLBACK_ON_ERROR = "false"

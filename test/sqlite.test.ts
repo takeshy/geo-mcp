@@ -56,3 +56,19 @@ test('MCP exposes reverse_geocode, place_search and route', async () => {
     assert.deepEqual(mode.enum, ['driving', 'walking']);
   } finally { await client.close(); await server.close(); }
 });
+
+test('route-disabled deployment exposes only place tools', async () => {
+  const server = createGeoMcpServer({ routesEnabled: false });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: 'route-disabled-test', version: '1' });
+  try {
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    const { tools } = await client.listTools();
+    assert.deepEqual(tools.map(tool => tool.name).sort(), ['place_search', 'reverse_geocode']);
+    const result = await client.callTool({ name: 'route', arguments: { lat: 35, lng: 139, toLat: 36, toLng: 140 } });
+    assert.equal(result.isError, true);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});

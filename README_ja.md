@@ -116,7 +116,7 @@ python3 scripts/import-geonames.py data/geonames/allCountries.zip --alternate-na
 
 `EXTERNAL_FALLBACK_ENABLED=false` で公開地図APIへの実行時依存を止められる。OSMにない施設や営業時間は取得できない。公共交通、リアルタイム渋滞・営業状況には非対応。
 
-## Cloud Run
+## 旧 Cloud Run 構成
 
 リポジトリ・MCPの名称は `geo-mcp` / Geo MCP。既存のGCPリソース名・コンテナ運用設定・配置先パスは互換性のため `geo-home` / `geo-home-mcp` を維持する。
 
@@ -147,3 +147,9 @@ npm run build
 ## Attribution
 
 © OpenStreetMap contributors. [ODbL / attribution](https://www.openstreetmap.org/copyright).
+
+## 経路機能を使わない共有VM
+
+4GiBの共有VMでは `GEO_ROUTES_ENABLED=false` に設定し、`place_search` と `reverse_geocode` のみ公開します。OSRMコンテナは起動せず、MCPから公開OSRMへの経路検索も無効になります。他の構成でこの設定を省略すると、従来の3つのツールを利用できます。
+
+本番は `geminihub-486523` の共有VMを使い、`scripts/deploy.sh` / `cloudbuild-vm.yaml` でデプロイします。ローカルのTerraform設定は `enable_routes=false`、`enable_weekly_update=false`、`enable_gateway=false` を維持してください。同じ `X-API-Key` で `https://geo.mcp.takeshy.work/mcp` に直接接続します。API GatewayとOSRMサーバーは削除済みです。既存のスナップショット・GeoNamesデータ・キーはそのまま使います。共有VMの運用・復旧手順は `../kakeratta/infra/shared-vm/README.md` を参照してください。

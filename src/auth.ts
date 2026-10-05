@@ -7,14 +7,14 @@ function sameSecret(presented: string, expected: string): boolean {
   return actual.length === wanted.length && timingSafeEqual(actual, wanted);
 }
 
-/** The gateway validates this Google API key before invoking the private service. */
+/** Validate the existing X-API-Key for direct LB clients and legacy Gateway clients. */
 export function authorizeRequest(headers: IncomingHttpHeaders, apiKey: string | undefined, gatewayKey: string | undefined): boolean {
   if (gatewayKey && headers["x-api-key"] !== undefined) {
     const presented = headers["x-api-key"];
     return typeof presented === "string" && sameSecret(presented, gatewayKey);
   }
   // Retain the existing Bearer interface for local use and the migration window.
-  // In production, Cloud Run IAM prevents direct client access to this service.
+  // The production HTTPS load balancer reaches this check directly.
   return authorize(headers.authorization, apiKey);
 }
 

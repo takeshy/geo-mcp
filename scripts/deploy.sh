@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds immutable images, reviews an infrastructure plan, then updates Cloud Run.
+# Builds an immutable MCP image and deploys it to the shared VM.
 set -euo pipefail
 GEO_REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$GEO_REPO_ROOT"
@@ -8,16 +8,5 @@ GEO_BUILD_SA="$(terraform -chdir=terraform output -raw cloud_build_service_accou
 npm run typecheck
 npm test
 python3 -m unittest discover -s test -p update_job_test.py
-GEO_BUILD_ID="$(gcloud builds submit --project="$GEO_PROJECT_ID" --config=cloudbuild-serverless.yaml --service-account="projects/$GEO_PROJECT_ID/serviceAccounts/$GEO_BUILD_SA" --format='value(id)' .)"
-# GCS current.json supplies the last successfully published dataset release.
-terraform -chdir=terraform plan -var="serverless_image_tag=$GEO_BUILD_ID" -var="update_image_tag=$GEO_BUILD_ID" -out=/tmp/geo-home-deploy.tfplan
-terraform -chdir=terraform apply /tmp/geo-home-deploy.tfplan
-# Keep the public MCP entry point on the custom domain only.
-# The pinned Terraform provider does not expose default_uri_disabled.
-gcloud run services update geo-home-mcp --project="$GEO_PROJECT_ID" --region="$(terraform -chdir=terraform output -raw region)" --no-default-url
-# Persist the image version so later Terraform operations do not roll it back.
-python3 - "$GEO_BUILD_ID" <<'PY'
-import json, sys
-from pathlib import Path
-Path('terraform/deployed.auto.tfvars.json').write_text(json.dumps({'serverless_image_tag':sys.argv[1], 'update_image_tag':sys.argv[1]})+'\n')
-PY
+# Production MCP now runs on the shared VM. Map updates remain manual.
+gcloud builds submit --project="$GEO_PROJECT_ID" --config=cloudbuild-vm.yaml --service-account="projects/$GEO_PROJECT_ID/serviceAccounts/$GEO_BUILD_SA" .

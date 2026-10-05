@@ -2,13 +2,13 @@
 
 English | [日本語](README_ja.md)
 
-Place search using self-hosted OpenStreetMap data, plus driving and walking directions.
+Place search using self-hosted OpenStreetMap data and reverse geocoding using GeoNames. Production runs on a shared 4 GiB Compute Engine VM with routing and API Gateway disabled.
 
 ## Tools
 
 - `reverse_geocode`: Returns the nearest town or village worldwide and its straight-line distance from the supplied latitude and longitude. Uses only a self-hosted GeoNames index, with no external API calls.
 - `place_search`: Searches by place name, category, or proximity. Returns results sorted by distance, along with opening hours and addresses.
-- `route`: Returns distance and travel time for driving (`driving`) and walking (`walking`).
+- `route`: Returns distance and travel time for driving (`driving`) and walking (`walking`). Optional for the legacy configuration; not exposed in production.
 
 The examples below show inputs and outputs when using self-hosted data. Place names, coordinates, distances, and travel times are illustrative. Responses show the MCP `structuredContent` field (`content` also includes explanatory text and reference links).
 
@@ -116,7 +116,7 @@ Results include `source`, `provider`, and, when an external service is used, `fa
 
 Set `EXTERNAL_FALLBACK_ENABLED=false` to disable runtime dependencies on public map APIs. Places and opening hours missing from OSM cannot be retrieved. Public transit, real-time traffic, and live business status are not supported.
 
-## Cloud Run
+## Legacy Cloud Run configuration
 
 The repository and MCP are named `geo-mcp` / Geo MCP. Existing GCP resource names, container deployment settings, and installation paths retain `geo-home` / `geo-home-mcp` for compatibility.
 
@@ -147,3 +147,9 @@ Supply environment variables through the runtime environment (Compose reads `.en
 ## Attribution
 
 © OpenStreetMap contributors. [ODbL / attribution](https://www.openstreetmap.org/copyright).
+
+## Shared VM without routing
+
+The shared 4 GiB VM deployment sets `GEO_ROUTES_ENABLED=false`. It exposes only `place_search` and `reverse_geocode`, and runs no OSRM containers. Disabling the route tool also prevents public OSRM fallback through MCP. Omit the setting to retain the existing three-tool interface in other deployments.
+
+Production deployment uses `scripts/deploy.sh` / `cloudbuild-vm.yaml` and the shared VM in `geminihub-486523`. Keep `enable_routes=false` and `enable_weekly_update=false` in the local Terraform configuration. Connect directly to `https://geo.mcp.takeshy.work/mcp` with the same `X-API-Key`. Keep `enable_gateway=false`; the Gateway and OSRM servers are removed. Snapshot/GeoNames data and the existing key remain in use. Shared VM operations and rollback are documented in `../kakeratta/infra/shared-vm/README.md`.

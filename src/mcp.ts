@@ -3,7 +3,7 @@ import { z } from "zod";
 import { reverseGeocode } from "./reverse-geocode.js";
 import { PlaceError, placeSearch, route, type PlaceAnswer } from "./places.js";
 
-export function createGeoMcpServer(): McpServer {
+export function createGeoMcpServer(options: { routesEnabled?: boolean } = {}): McpServer {
   const server = new McpServer({ name: "geo-mcp", version: "0.1.0" });
   server.registerTool(
     "reverse_geocode",
@@ -31,7 +31,7 @@ export function createGeoMcpServer(): McpServer {
     async (input) => placeResult(() => placeSearch(input)),
   );
 
-  server.registerTool(
+  if (options.routesEnabled ?? process.env.GEO_ROUTES_ENABLED !== "false") server.registerTool(
     "route",
     {
       description: "指定した位置から目的地までの道路の所要時間と距離（OSRM）。目的地は名前またはtoLat/toLngで渡す。公共交通・リアルタイムの渋滞は非対応。",

@@ -44,7 +44,7 @@ locals {
   serverless_registry = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_repository_id}"
 }
 resource "google_cloud_run_v2_service" "router" {
-  for_each            = toset(["car", "foot"])
+  for_each            = var.enable_routes ? toset(["car", "foot"]) : toset([])
   name                = "geo-osrm-${each.key}"
   location            = var.region
   deletion_protection = false
@@ -211,4 +211,10 @@ resource "google_cloud_run_domain_mapping" "geo" {
     prevent_destroy = true
     ignore_changes  = [spec[0].certificate_mode]
   }
+}
+
+variable "enable_routes" {
+  description = "Provision OSRM services and expose the route tool."
+  type        = bool
+  default     = true
 }
